@@ -6,9 +6,13 @@ namespace Radebatz\OpenApi\Introspector\Routing;
  * Resolves a route's handler to the method reflector the pipeline derives from.
  *
  * The result is always a method: a controller action is that method, and an invokable
- * controller is its `__invoke`, which swagger-php names `Class::__invoke` so two of them do
- * not collide. A closure has nothing to reflect on that names it, so it yields `null` and the
- * route is contributed bare. Extend to resolve a project's own handler conventions, such as a
+ * controller is its `__invoke`. swagger-php derives the operation id from the method, the
+ * path and the reflected name together, so two invokables never collide. A closure has
+ * nothing to reflect on that names it, so it yields `null` and the route is contributed bare.
+ *
+ * Only the operation carries the reflector. The pipeline reads its docblock for the summary
+ * and description and never its signature, so parameters the container injects are invisible
+ * by construction, and so is the signature's type for a route parameter. Extend to resolve a project's own handler conventions, such as a
  * container id or a command class.
  */
 class Handler
