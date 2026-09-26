@@ -9,16 +9,14 @@ use OpenApi\Spec as OA;
  */
 class AttributedController
 {
-    #[OA\Operation\Get(path: '/users', summary: 'All the users', responses: [
-        new OA\Response(response: 200, description: 'All users'),
-    ])]
+    #[OA\Operation\Get(path: '/users', summary: 'All the users')]
+    #[OA\Response(response: 200, description: 'All users')]
     public function index(): void
     {
     }
 
-    #[OA\Operation\Get(path: '/legacy', responses: [
-        new OA\Response(response: 200, description: 'Still documented'),
-    ])]
+    #[OA\Operation\Get(path: '/legacy')]
+    #[OA\Response(response: 200, description: 'Still documented')]
     public function legacy(): void
     {
     }
