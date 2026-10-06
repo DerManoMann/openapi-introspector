@@ -1,6 +1,16 @@
 {
     "name": "radebatz/openapi-introspector",
-    "description": "Reads what a framework already knows about itself and contributes it to an OpenAPI document.",
+    "description": "Documents the routes your Laravel or Slim application already has: reads them from the framework and contributes them to the OpenAPI document swagger-php builds, so nothing is declared twice. The reverse of openapi-router.",
+    "keywords": [
+        "openapi",
+        "swagger",
+        "swagger-php",
+        "documentation",
+        "routes",
+        "introspection",
+        "laravel",
+        "slim"
+    ],
     "license": [
         "MIT"
     ],

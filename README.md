@@ -6,13 +6,29 @@
 
 ## Introduction
 
-Reads what a PHP framework already knows about the API it serves and contributes it to the
-OpenAPI document [swagger-php](https://github.com/zircote/swagger-php) builds, so a route no
-attribute describes still appears, and a documented path no route serves is noticed.
+Your framework already knows your API. Every route has a method, a path, path parameters
+with their constraints, and a handler whose docblock and signature describe it. Documenting
+that with [swagger-php](https://github.com/zircote/swagger-php) usually means writing it all a
+second time, as attributes, and then keeping the two in step by hand. The documentation drifts
+the first time a route changes and its attribute does not.
+
+openapi-introspector reads the routes from the framework instead, and contributes them to the
+OpenAPI document swagger-php builds:
+
+* **Routes you have not documented still appear.** Each gets its path parameters, with a
+  route constraint as the parameter's pattern. Where the route dispatches to a class method,
+  it also gets a summary, description and parameters from that method, exactly as if it had
+  been scanned.
+* **Attributes you have written still win.** Where attributes describe a route, they are kept
+  whole, so you add them only for what a router cannot know: responses, request bodies, a
+  better description.
+* **Documentation without a route is reported.** An inventory lists every method and path, and
+  says which are documented but not routed. That is a defect the document alone cannot show.
 
 This is the reverse of [openapi-router](https://github.com/DerManoMann/openapi-router), which
-configures the router from the attributes. The two are complements: the introspector covers what
-exists, openapi-router drives routing from what is declared, and a project can use both.
+builds the routes from the attributes. The two are complements: openapi-router makes the
+document the source of the routes, the introspector makes the routes the source of the
+document, and a project can use both.
 
 **Spec attributes only.** The package works inside swagger-php's spec pipeline, through
 `Builder::withSpecification()`. Classic mode assembles no specification, so there is nothing
