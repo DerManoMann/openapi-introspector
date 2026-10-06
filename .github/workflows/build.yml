@@ -1,0 +1,21 @@
+name: build
+
+on:
+  schedule:
+    - cron: "0 13 * * 1"
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  call-laravel:
+    uses: ./.github/workflows/laravel.yml
+    with:
+      php-versions: '8.2,8.3,8.4,8.5'
+  call-slim:
+    uses: ./.github/workflows/slim.yml
+    with:
+      php-versions: '8.2,8.3,8.4,8.5'
