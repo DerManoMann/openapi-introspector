@@ -67,6 +67,129 @@ route dispatches to a class method, the operation carries that method's reflecto
 pipeline derives the summary, the description and the parameters from it as it would for a
 scanned one. A closure route is contributed bare and gets an id from its method and path.
 
+### Where the routes come from
+
+Hand the adapter the route table once the application has registered its routes.
+
+**Laravel**: `app(Router::class)`, or `Route::getRoutes()` through the facade, after the
+application has booted. An artisan command qualifies. A cached route table works the same,
+because `CompiledRouteCollection` rebuilds `Route` objects when asked for them.
+
+**Slim**: `$app->getRouteCollector()`, after the code that defines the routes has run and
+before `$app->run()`.
+
+### Choosing the routes
+
+The whole table is rarely what a document should describe. A Laravel application also routes
+Sanctum's CSRF cookie, Telescope, Horizon, Ignition and L5-Swagger's own documentation pages,
+and every route the adapter sees becomes an `Introspected` entry in the inventory. Both adapters
+also take any iterable of routes, so choosing them is an `array_filter` before the adapter
+sees them.
+
+Leaving out vendor routes needs no convention from the project. A route is vendor when its
+handler is defined under `vendor/`, which is the test `php artisan route:list --except-vendor`
+applies:
+
+```php
+use Illuminate\Routing\RedirectController;
+use Illuminate\Routing\Route;
+use Illuminate\Routing\Router;
+use Illuminate\Routing\ViewController;
+use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
+
+$vendor = base_path('vendor');
+
+$routes = array_filter(
+    app(Router::class)->getRoutes()->getRoutes(),
+    static function (Route $route) use ($vendor): bool {
+        $uses = $route->getAction('uses');
+
+        if ($uses instanceof \Closure) {
+            $file = (new \ReflectionFunction($uses))->getFileName();
+        } elseif (is_string($uses) && !str_contains($uses, 'SerializableClosure')) {
+            $class = ltrim($route->getControllerClass(), '\\');
+            // Route::redirect() and Route::view() are the application's own routes
+            if (in_array($class, [RedirectController::class, ViewController::class], true)) {
+                return true;
+            }
+            $file = (new \ReflectionClass($class))->getFileName();
+        } else {
+            return true;
+        }
+
+        return !str_starts_with((string) $file, $vendor);
+    },
+);
+
+$adapter = new LaravelAdapter($routes);
+```
+
+Narrower tests work the same way. In Laravel, `Route::middleware()` returns the route's
+middleware, its group included, so the `api` group is one comparison. In Slim, a group's
+prefix is part of each route's pattern:
+
+```php
+use Illuminate\Routing\Route;
+use Illuminate\Routing\Router;
+use Slim\Interfaces\RouteInterface;
+
+// Laravel: the api middleware group
+$routes = array_filter(
+    app(Router::class)->getRoutes()->getRoutes(),
+    static fn (Route $route): bool => in_array('api', $route->middleware(), true),
+);
+
+// Slim: everything under /api
+$routes = array_filter(
+    $app->getRouteCollector()->getRoutes(),
+    static fn (RouteInterface $route): bool => str_starts_with($route->getPattern(), '/api'),
+);
+```
+
+### Generating for L5-Swagger
+
+[L5-Swagger](https://github.com/DarkaOnLine/L5-Swagger) builds its document itself, with no
+hook for a contribution, so for now the integration is an artisan command that writes the file
+L5-Swagger serves:
+
+```php
+use Illuminate\Console\Command;
+use Illuminate\Routing\Router;
+use OpenApi\Builder;
+use OpenApi\Builder\Mode;
+use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
+use Radebatz\OpenApi\Introspector\Introspector;
+use Radebatz\OpenApi\Introspector\Status;
+
+final class GenerateApiDocs extends Command
+{
+    protected $signature = 'api-docs:generate';
+
+    protected $description = 'Build the OpenAPI document from the attributes and the routes';
+
+    public function handle(Router $router): int
+    {
+        $introspector = (new Introspector())->withAdapter(new LaravelAdapter($router));
+
+        $introspector
+            ->register((new Builder())->setMode(Mode::SPEC)->addSource(app_path()))
+            ->build()
+            ->saveAs(storage_path('api-docs/api-docs.json'));
+
+        foreach ($introspector->inventory()->entries(Status::Unrouted) as $entry) {
+            $this->warn("Documented but not routed: {$entry->method} {$entry->path}");
+        }
+
+        return self::SUCCESS;
+    }
+}
+```
+
+`storage_path('api-docs/api-docs.json')` is L5-Swagger's default `docs` path and `docs_json`
+file. Keep `generate_always` off, which is the default: when it is on, L5-Swagger regenerates
+the document on every request and overwrites this one. Pass the command a filtered list of
+routes, as above, rather than the whole router.
+
 ### What wins
 
 The framework wins on existence and on dispatch facts: which paths and methods exist, and

@@ -10,6 +10,7 @@ use Radebatz\OpenApi\Introspector\Tests\Fixtures\PingController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\UsersController;
 use Slim\App;
 use Slim\Factory\AppFactory;
+use Slim\Interfaces\RouteInterface;
 
 final class SlimAdapterTest extends TestCase
 {
@@ -87,6 +88,23 @@ final class SlimAdapterTest extends TestCase
 
         $this->assertNull($this->operations($app)[0]->operationId);
         $this->assertSame('users.index', $this->operations($app, nameAsOperationId: true)[0]->operationId);
+    }
+
+    public function testAFilteredListOfRoutesYieldsOnlyThoseRoutes(): void
+    {
+        $app = AppFactory::create();
+        $app->get('/api/users', [UsersController::class, 'index']);
+        $app->get('/health', PingController::class);
+
+        $routes = array_filter(
+            $app->getRouteCollector()->getRoutes(),
+            static fn (RouteInterface $route): bool => str_starts_with($route->getPattern(), '/api'),
+        );
+
+        $operations = iterator_to_array((new SlimAdapter($routes))->operations(), false);
+
+        $this->assertCount(1, $operations);
+        $this->assertSame('/api/users', $operations[0]->path);
     }
 
     /**

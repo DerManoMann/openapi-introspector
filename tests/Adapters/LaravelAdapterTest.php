@@ -3,6 +3,7 @@
 namespace Radebatz\OpenApi\Introspector\Tests\Adapters;
 
 use Illuminate\Events\Dispatcher;
+use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 use OpenApi\Spec as OA;
 use PHPUnit\Framework\TestCase;
@@ -101,6 +102,23 @@ final class LaravelAdapterTest extends TestCase
 
         $this->assertNull($this->operations(new LaravelAdapter($router))[0]->operationId);
         $this->assertSame('users.index', $this->operations(new LaravelAdapter($router, nameAsOperationId: true))[0]->operationId);
+    }
+
+    public function testAFilteredListOfRoutesYieldsOnlyThoseRoutes(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('api/users', [UsersController::class, 'index'])->middleware('api');
+        $router->get('sanctum/csrf-cookie', static fn (): string => 'cookie');
+
+        $routes = array_filter(
+            $router->getRoutes()->getRoutes(),
+            static fn (Route $route): bool => in_array('api', $route->middleware(), true),
+        );
+
+        $operations = $this->operations(new LaravelAdapter($routes));
+
+        $this->assertCount(1, $operations);
+        $this->assertSame('/api/users', $operations[0]->path);
     }
 
     /**
