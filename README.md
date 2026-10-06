@@ -24,9 +24,7 @@ Supported frameworks:
 ## Requirements
 
 * PHP 8.2 or higher
-* `zircote/swagger-php` with `Builder::withSpecification()` — merged upstream
-  ([#2218](https://github.com/zircote/swagger-php/pull/2218)) but not yet in a release, so this
-  package requires `dev-master` until a 6.x minor carries it
+* `zircote/swagger-php` 6.12 or higher, the first release with `Builder::withSpecification()`
 
 ## Usage
 
