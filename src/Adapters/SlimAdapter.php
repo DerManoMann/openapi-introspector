@@ -15,11 +15,17 @@ use Slim\Interfaces\RouteInterface;
  * Slim keeps the constraint inside the pattern (`/users/{id:[0-9]+}`) and marks optional
  * segments with brackets (`/users[/{id}]`), so both are parsed out here. A class-based
  * callable carries its method's reflector; a closure is yielded bare.
+ *
+ * It takes the route collector or any iterable of routes, so a caller that wants only some of
+ * them filters first and hands over what is left.
  */
 final readonly class SlimAdapter implements AdapterInterface
 {
+    /**
+     * @param RouteCollectorInterface|iterable<RouteInterface> $routes
+     */
     public function __construct(
-        private RouteCollectorInterface $routes,
+        private RouteCollectorInterface|iterable $routes,
         private bool $nameAsOperationId = false,
         private Handler $handler = new Handler(),
         private Constraint $constraint = new Constraint(),
@@ -28,7 +34,9 @@ final readonly class SlimAdapter implements AdapterInterface
 
     public function operations(): iterable
     {
-        foreach ($this->routes->getRoutes() as $route) {
+        $routes = $this->routes instanceof RouteCollectorInterface ? $this->routes->getRoutes() : $this->routes;
+
+        foreach ($routes as $route) {
             $reflector = $this->handler->reflectCallable($route->getCallable());
             $name = $this->nameAsOperationId ? $route->getName() : null;
 

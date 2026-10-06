@@ -16,11 +16,17 @@ use Radebatz\OpenApi\Introspector\Routing\Handler;
  * A route with a controller action carries that method's reflector, so the pipeline reads the
  * docblock and the signature; a closure route is yielded bare. `HEAD` is dropped as an
  * artefact of `GET`, and a fallback route is not an endpoint.
+ *
+ * It takes the router, its route collection, or any iterable of routes, so a caller that wants
+ * only some of them filters first and hands over what is left.
  */
 final readonly class LaravelAdapter implements AdapterInterface
 {
+    /**
+     * @param Router|RouteCollectionInterface|iterable<Route> $routes
+     */
     public function __construct(
-        private Router|RouteCollectionInterface $routes,
+        private Router|RouteCollectionInterface|iterable $routes,
         private bool $nameAsOperationId = false,
         private Handler $handler = new Handler(),
         private Constraint $constraint = new Constraint(),
@@ -29,9 +35,13 @@ final readonly class LaravelAdapter implements AdapterInterface
 
     public function operations(): iterable
     {
-        $collection = $this->routes instanceof Router ? $this->routes->getRoutes() : $this->routes;
+        $routes = match (true) {
+            $this->routes instanceof Router => $this->routes->getRoutes()->getRoutes(),
+            $this->routes instanceof RouteCollectionInterface => $this->routes->getRoutes(),
+            default => $this->routes,
+        };
 
-        foreach ($collection->getRoutes() as $route) {
+        foreach ($routes as $route) {
             if ($route->isFallback) {
                 continue;
             }
