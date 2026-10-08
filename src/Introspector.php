@@ -7,6 +7,7 @@ use OpenApi\Contracts\AttributeInterface;
 use OpenApi\Spec as OA;
 use OpenApi\Spec\Schema;
 use OpenApi\Specification;
+use OpenApi\Specification\ComponentIndex;
 use OpenApi\Specification\PathItemHierarchy;
 use OpenApi\Utils\AttributeFactory;
 use OpenApi\Utils\Pipeline;
@@ -89,6 +90,7 @@ final class Introspector
         $inventory = new Inventory();
         $routes = $this->routes();
         $hierarchy = $specification->buildPathItemHierarchy();
+        $components = $specification->buildComponentIndex();
 
         // 1. pair operations with routes. An operation's key uses the path it compiles to, with
         // its controller's prefix in front, so it can be compared with a route's full path.
@@ -137,7 +139,7 @@ final class Introspector
 
             $claimed[$index] = true;
             $route = $routes->operation($index);
-            $this->complete($specification, $operation, $route, $hierarchy);
+            $this->complete($components, $operation, $route, $hierarchy);
             $inventory->record(new Entry((string) $route->method, (string) $route->path, $isDescribed ? Status::Matched : Status::Introspected, $routes->adapter($index)));
         }
 
@@ -228,7 +230,7 @@ final class Introspector
      * `operationId` and the path parameters: a parameter it lacks is added, and one it has gets the
      * route's schema where it has none, or the route's `pattern` where its schema has none.
      */
-    private function complete(Specification $specification, OA\Operation $operation, OA\Operation $route, PathItemHierarchy $hierarchy): void
+    private function complete(ComponentIndex $components, OA\Operation $operation, OA\Operation $route, PathItemHierarchy $hierarchy): void
     {
         // a path equal to the route's is the full path, which the translator set; the pipeline
         // still puts the controller's prefix in front, so it has to come off here
@@ -239,7 +241,7 @@ final class Introspector
         $operation->operationId ??= $route->operationId;
 
         foreach ($route->parameters ?? [] as $parameter) {
-            $existing = $this->findParameter($specification, $operation, (string) $parameter->name, (string) $parameter->in);
+            $existing = $this->findParameter($components, $operation, (string) $parameter->name, (string) $parameter->in);
 
             // `null` is a reference to a component, which belongs to every operation using it
             // and is not changed for one of them
@@ -260,13 +262,13 @@ final class Introspector
      * The parameter an operation already has for a name and location: the inline one to fold
      * into, `null` for a reference to a component, which is left alone, or `false` for none.
      */
-    private function findParameter(Specification $specification, OA\Operation $operation, string $name, string $in): OA\Parameter|false|null
+    private function findParameter(ComponentIndex $components, OA\Operation $operation, string $name, string $in): OA\Parameter|false|null
     {
         foreach ($operation->parameters ?? [] as $parameter) {
             // the resolver only resolves class references, so a reference to a component still
             // carries no name or location: read them off the component it points to
             if (is_string($parameter->ref)) {
-                $component = $this->component($specification, $parameter->ref);
+                $component = $components->findParameter($parameter->ref);
                 if ($component instanceof OA\Parameter && $component->name === $name && $component->in === $in) {
                     return null;
                 }
@@ -284,25 +286,6 @@ final class Introspector
         }
 
         return false;
-    }
-
-    /**
-     * The parameter component a `#/components/parameters/...` reference points to.
-     */
-    private function component(Specification $specification, string $ref): ?OA\Parameter
-    {
-        $prefix = '#/components/parameters/';
-        if (!str_starts_with($ref, $prefix)) {
-            return null;
-        }
-
-        foreach ($specification->parameters as $parameter) {
-            if ($parameter->component === substr($ref, strlen($prefix))) {
-                return $parameter;
-            }
-        }
-
-        return null;
     }
 
     /**
