@@ -201,7 +201,9 @@ what the router will match. Attributes win on description. In practice:
   class in the builder's sources, since only those are read for attributes.
 * Where both describe a path parameter, it is folded by name. The attribute's schema and
   description win, and the route's `pattern` is kept where the attribute has none. A
-  parameter referencing a component is left as it is.
+  parameter referencing a component is left as it is, and so is one the controller declares on
+  its `#[OA\PathItem(parameters: ...)]`: the route adds no operation-level copy that would
+  replace it.
 * An operation declared on a method other than the handler, for the route's method and path,
   is completed the same way. The attribute operation is the base, so one that only adds a tag
   or a description still gets the route's path parameters.

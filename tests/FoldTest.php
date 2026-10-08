@@ -93,6 +93,18 @@ final class FoldTest extends TestCase
         $this->assertArrayNotHasKey('parameters', $pathItem['get'], "an operation-level `id` would replace the path item's whole");
     }
 
+    public function testAContributedRouteLeavesThePathItemsParametersAlone(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('things/{id}/history/{page?}', [SharedParameterController::class, 'history'])->where('id', '[0-9]+');
+
+        [$document] = $this->build($router, SharedParameterController::class);
+
+        $this->assertArrayNotHasKey('parameters', $document['paths']['/things/{id}/history']['get'], 'a handler serving several routes contributes them whole');
+        $parameters = $document['paths']['/things/{id}/history/{page}']['get']['parameters'];
+        $this->assertSame(['page'], array_column($parameters, 'name'), 'what the path item declares is not repeated');
+    }
+
     public function testAHandlerServingSeveralRoutesFoldsOnlyTheOneItsAttributeNames(): void
     {
         $router = new Router(new Dispatcher());

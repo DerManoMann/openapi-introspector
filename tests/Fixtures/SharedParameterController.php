@@ -14,4 +14,8 @@ class SharedParameterController
     public function show(int $id): void
     {
     }
+
+    public function history(int $id, ?int $page = null): void
+    {
+    }
 }

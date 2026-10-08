@@ -162,6 +162,13 @@ final class Introspector
             $route = $routes->operation($index);
             $contributed = self::copy($route);
             $this->relativise($contributed, $hierarchy);
+            // the same rule as for a completed operation: what the path items declare is theirs
+            if ($contributed->parameters !== null) {
+                $contributed->parameters = array_values(array_filter(
+                    $contributed->parameters,
+                    fn (OA\Parameter $parameter): bool => !$this->isShared($components, $contributed, $hierarchy, (string) $parameter->name, (string) $parameter->in),
+                )) ?: null;
+            }
             $specification->add($contributed);
             $inventory->record(new Entry((string) $route->method, (string) $route->path, Status::Introspected, $routes->adapter($index)));
         }
@@ -228,7 +235,8 @@ final class Introspector
      *
      * The operation is the base and wins on every field it sets. From the route it takes the
      * `operationId` and the path parameters: a parameter it lacks is added, and one it has gets the
-     * route's schema where it has none, or the route's `pattern` where its schema has none.
+     * route's schema where it has none, or the route's `pattern` where its schema has none. A
+     * parameter its controller's path items declare is left to them.
      */
     private function complete(ComponentIndex $components, OA\Operation $operation, OA\Operation $route, PathItemHierarchy $hierarchy): void
     {
@@ -241,11 +249,17 @@ final class Introspector
         $operation->operationId ??= $route->operationId;
 
         foreach ($route->parameters ?? [] as $parameter) {
-            $existing = $this->findParameter($components, $operation, (string) $parameter->name, (string) $parameter->in);
+            $name = (string) $parameter->name;
+            $in = (string) $parameter->in;
+            $existing = $this->findParameter($components, $operation->parameters, $name, $in);
 
             // `null` is a reference to a component, which belongs to every operation using it
             // and is not changed for one of them
             if ($existing === false) {
+                if ($this->isShared($components, $operation, $hierarchy, $name, $in)) {
+                    continue;
+                }
+
                 $operation->parameters ??= [];
                 $operation->parameters[] = self::copy($parameter);
             } elseif ($existing instanceof OA\Parameter && $parameter->schema instanceof Schema) {
@@ -259,12 +273,14 @@ final class Introspector
     }
 
     /**
-     * The parameter an operation already has for a name and location: the inline one to fold
-     * into, `null` for a reference to a component, which is left alone, or `false` for none.
+     * The parameter a list already has for a name and location: the inline one to fold into,
+     * `null` for a reference to a component, which is left alone, or `false` for none.
+     *
+     * @param list<OA\Parameter>|null $parameters
      */
-    private function findParameter(ComponentIndex $components, OA\Operation $operation, string $name, string $in): OA\Parameter|false|null
+    private function findParameter(ComponentIndex $components, ?array $parameters, string $name, string $in): OA\Parameter|false|null
     {
-        foreach ($operation->parameters ?? [] as $parameter) {
+        foreach ($parameters ?? [] as $parameter) {
             // the resolver only resolves class references, so a reference to a component still
             // carries no name or location: read them off the component it points to
             if (is_string($parameter->ref)) {
@@ -282,6 +298,24 @@ final class Introspector
 
             if ($parameterName === $name && $parameter->in === $in) {
                 return $parameter;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether the path items governing an operation's class declare a parameter.
+     *
+     * They are emitted at path level and apply to every operation under it. An operation-level
+     * parameter of the same name and location would replace one of them whole, so the route's
+     * would win over the attribute's.
+     */
+    private function isShared(ComponentIndex $components, OA\Operation $operation, PathItemHierarchy $hierarchy, string $name, string $in): bool
+    {
+        foreach ($hierarchy->forOperation($operation) as $pathItem) {
+            if ($this->findParameter($components, $pathItem->parameters, $name, $in) !== false) {
+                return true;
             }
         }
 
