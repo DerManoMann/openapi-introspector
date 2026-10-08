@@ -14,6 +14,7 @@ use Radebatz\OpenApi\Introspector\Introspector;
 use Radebatz\OpenApi\Introspector\Status;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\PrefixedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\RoutedController;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\SharedParameterController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\UsersController;
 
 /**
@@ -78,6 +79,18 @@ final class FoldTest extends TestCase
 
         $operation = $document['paths']['/users/{id}']['delete'];
         $this->assertSame([['$ref' => '#/components/parameters/UserId']], $operation['parameters']);
+    }
+
+    public function testAParameterThePathItemDeclaresIsNotShadowed(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('things/{id}', [SharedParameterController::class, 'show'])->where('id', '[0-9]+');
+
+        [$document] = $this->build($router, SharedParameterController::class);
+
+        $pathItem = $document['paths']['/things/{id}'];
+        $this->assertSame('The thing id', $pathItem['parameters'][0]['description']);
+        $this->assertArrayNotHasKey('parameters', $pathItem['get'], "an operation-level `id` would replace the path item's whole");
     }
 
     public function testAHandlerServingSeveralRoutesFoldsOnlyTheOneItsAttributeNames(): void
