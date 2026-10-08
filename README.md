@@ -195,9 +195,21 @@ routes, as above, rather than the whole router.
 The framework wins on existence and on dispatch facts: which paths and methods exist, and
 what the router will match. Attributes win on description. In practice:
 
-* A route attributes already describe is left to the attributes. The adapter's operation
-  stands aside whole, because the pipeline cannot yet fold two halves of one operation.
+* Attributes on a route's handler add to what the route gives. A handler carrying only
+  `#[OA\Response]` gets the route's operation for the response to join. An operation the
+  attributes declare without a path or method gets the route's. This needs the handler's
+  class in the builder's sources, since only those are read for attributes.
+* Where both describe a path parameter, it is folded by name. The attribute's schema and
+  description win, and the route's `pattern` is kept where the attribute has none. A
+  parameter referencing a component is left as it is.
+* An operation declared on a method other than the handler, for the route's method and path,
+  is completed the same way. The attribute operation is the base, so one that only adds a tag
+  or a description still gets the route's path parameters.
 * A route nothing describes is contributed by the adapter.
+* A controller's `#[OA\PathItem(prefix: ...)]` is applied once. The route's full path already
+  contains it, so it is taken off before the pipeline adds it again.
+* A handler serving several routes, such as a Laravel route with an optional parameter, folds
+  only the route its attribute names by method and path. The others are contributed whole.
 * A route parameter's constraint, such as Laravel's `where('id', '[0-9]+')` or Slim's
   `{id:[0-9]+}`, becomes the parameter's `pattern`. The type is `integer` only where the
   pattern admits nothing else, and `string` otherwise.
