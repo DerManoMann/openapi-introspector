@@ -53,7 +53,7 @@ use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Introspector;
 
 $introspector = (new Introspector())
-    ->withAdapter(new LaravelAdapter($router));
+    ->addAdapter(new LaravelAdapter($router));
 
 $result = $introspector
     ->register((new Builder())->setMode(Mode::SPEC)->addSource(__DIR__ . '/app'))
@@ -169,7 +169,7 @@ final class GenerateApiDocs extends Command
 
     public function handle(Router $router): int
     {
-        $introspector = (new Introspector())->withAdapter(new LaravelAdapter($router));
+        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router));
 
         $introspector
             ->register((new Builder())->setMode(Mode::SPEC)->addSource(app_path()))

@@ -33,7 +33,7 @@ final class Introspector
 
     private ?Inventory $inventory = null;
 
-    public function withAdapter(AdapterInterface ...$adapters): static
+    public function addAdapter(AdapterInterface ...$adapters): static
     {
         foreach ($adapters as $adapter) {
             $this->adapters[] = $adapter;

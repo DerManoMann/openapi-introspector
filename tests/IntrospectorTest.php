@@ -29,7 +29,7 @@ final class IntrospectorTest extends TestCase
         $router = new Router(new Dispatcher());
         $router->get('users/{id}', [UsersController::class, 'show'])->where('id', '[0-9]+');
 
-        $introspector = (new Introspector())->withAdapter(new LaravelAdapter($router));
+        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router));
         $document = $introspector->register($this->builder())->build()->toArray();
 
         $operation = $document['paths']['/users/{id}']['get'];
@@ -50,7 +50,7 @@ final class IntrospectorTest extends TestCase
         $router = new Router(new Dispatcher());
         $router->get('users', [UsersController::class, 'index']);
 
-        $introspector = (new Introspector())->withAdapter(new LaravelAdapter($router));
+        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router));
         $document = $introspector->register($this->builder()->addSource(new \ReflectionClass(AttributedController::class)))
             ->build()
             ->toArray();
@@ -67,7 +67,7 @@ final class IntrospectorTest extends TestCase
 
     public function testADescribedOperationNoRouteServesIsUnrouted(): void
     {
-        $introspector = (new Introspector())->withAdapter(new LaravelAdapter(new Router(new Dispatcher())));
+        $introspector = (new Introspector())->addAdapter(new LaravelAdapter(new Router(new Dispatcher())));
         $document = $introspector->register($this->builder()->addSource(new \ReflectionClass(AttributedController::class)))
             ->build()
             ->toArray();
@@ -86,7 +86,7 @@ final class IntrospectorTest extends TestCase
         $router = new Router(new Dispatcher());
         $router->get('ping', static fn (): string => 'pong');
 
-        $document = (new Introspector())->withAdapter(new LaravelAdapter($router))
+        $document = (new Introspector())->addAdapter(new LaravelAdapter($router))
             ->register($this->builder())
             ->build()
             ->toArray();
@@ -98,7 +98,7 @@ final class IntrospectorTest extends TestCase
 
     public function testTheFirstAdapterToYieldAKeyWins(): void
     {
-        $introspector = (new Introspector())->withAdapter(
+        $introspector = (new Introspector())->addAdapter(
             $this->adapter(new OA\Operation\Get(path: '/things', operationId: 'first')),
             $this->adapter(new OA\Operation\Get(path: '/things', operationId: 'second')),
         );
@@ -113,7 +113,7 @@ final class IntrospectorTest extends TestCase
 
     public function testAnOperationWithoutAPathIsADefectInTheAdapter(): void
     {
-        $introspector = (new Introspector())->withAdapter($this->adapter(new OA\Operation(method: 'get')));
+        $introspector = (new Introspector())->addAdapter($this->adapter(new OA\Operation(method: 'get')));
 
         $this->expectException(\InvalidArgumentException::class);
         $introspector->introspect(new Specification());

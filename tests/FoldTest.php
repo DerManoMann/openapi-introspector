@@ -161,7 +161,7 @@ final class FoldTest extends TestCase
         $router->get('api/users/{id}', [PrefixedController::class, 'show'])->where('id', '[0-9]+');
         $router->get('ping', static fn (): string => 'pong');
 
-        $introspector = (new Introspector())->withAdapter(new LaravelAdapter($router));
+        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router));
         $first = $introspector->register($this->builder(PrefixedController::class))->build()->toArray();
         $second = $introspector->register($this->builder(PrefixedController::class))->build()->toArray();
 
@@ -175,7 +175,7 @@ final class FoldTest extends TestCase
      */
     private function build(Router $router, string $source): array
     {
-        $introspector = (new Introspector())->withAdapter(new LaravelAdapter($router));
+        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router));
         $document = $introspector->register($this->builder($source))->build()->toArray();
 
         return [$document, $introspector];
