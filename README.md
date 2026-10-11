@@ -19,9 +19,9 @@ OpenAPI document swagger-php builds:
   route constraint as the parameter's pattern. Where the route dispatches to a class method,
   it also gets a summary, description and parameters from that method, exactly as if it had
   been scanned.
-* **Attributes you have written still win.** Where attributes describe a route, they are kept
-  whole, so you add them only for what a router cannot know: responses, request bodies, a
-  better description.
+* **Attributes you have written still win on description.** They fold into the route's
+  operation field by field, so you add them only for what a router cannot know: responses,
+  request bodies, a better description.
 * **Documentation without a route is reported.** An inventory lists every method and path, and
   says which are documented but not routed. That is a defect the document alone cannot show.
 
