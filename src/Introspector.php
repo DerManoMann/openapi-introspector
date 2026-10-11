@@ -79,7 +79,8 @@ final class Introspector
      * specification with all of its children, including any the {@see RouteTranslator} added for
      * a handler. It works in four steps:
      *
-     * 1. Pair each assembled operation with the route it is for, if any.
+     * 1. Pair each assembled operation with the route it is for, if any: one its handler method
+     *    serves, or else the one for its method and full path.
      * 2. Complete each paired operation from its route. Where a route has more than one operation,
      *    one only the translator made stands aside, so attributes keep the final say.
      * 3. Contribute every route no operation was paired with, as the adapter yielded it.
@@ -92,9 +93,11 @@ final class Introspector
         $hierarchy = $specification->buildPathItemHierarchy();
         $components = $specification->buildComponentIndex();
 
-        // 1. pair operations with routes. An operation's key uses the path it compiles to, with
-        // its controller's prefix in front, so it can be compared with a route's full path.
-        // "Described" means attributes contributed to it, rather than only the translator.
+        // 1. pair operations with routes: first by the handler method an operation sits on, and
+        // where that leaves no single route, by its method and the path it compiles to, with its
+        // controller's prefix in front so it compares with a route's full path. The same path
+        // keys the operation here. "Described" means attributes contributed to it, rather than
+        // only the translator.
         /** @var list<array{OA\Operation, int|null, string, bool}> $assembled operation, route, key, described */
         $assembled = [];
         /** @var array<string, array{string, string}> $described method and path, by key */
