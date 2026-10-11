@@ -19,9 +19,9 @@ OpenAPI document swagger-php builds:
   route constraint as the parameter's pattern. Where the route dispatches to a class method,
   it also gets a summary, description and parameters from that method, exactly as if it had
   been scanned.
-* **Attributes you have written still win.** Where attributes describe a route, they are kept
-  whole, so you add them only for what a router cannot know: responses, request bodies, a
-  better description.
+* **Attributes you have written still win on description.** They fold into the route's
+  operation field by field, so you add them only for what a router cannot know: responses,
+  request bodies, a better description.
 * **Documentation without a route is reported.** An inventory lists every method and path, and
   says which are documented but not routed. That is a defect the document alone cannot show.
 
@@ -42,7 +42,7 @@ Supported frameworks:
 ## Requirements
 
 * PHP 8.2 or higher
-* `zircote/swagger-php` 6.12 or higher, the first release with `Builder::withSpecification()`
+* `zircote/swagger-php` 6.13 or higher, for the `PathItem` chain helpers and `ComponentIndex::parameterKey()`
 
 ## Usage
 
@@ -53,7 +53,7 @@ use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Introspector;
 
 $introspector = (new Introspector())
-    ->withAdapter(new LaravelAdapter($router));
+    ->addAdapter(new LaravelAdapter($router));
 
 $result = $introspector
     ->register((new Builder())->setMode(Mode::SPEC)->addSource(__DIR__ . '/app'))
@@ -169,7 +169,7 @@ final class GenerateApiDocs extends Command
 
     public function handle(Router $router): int
     {
-        $introspector = (new Introspector())->withAdapter(new LaravelAdapter($router));
+        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router));
 
         $introspector
             ->register((new Builder())->setMode(Mode::SPEC)->addSource(app_path()))
@@ -195,9 +195,34 @@ routes, as above, rather than the whole router.
 The framework wins on existence and on dispatch facts: which paths and methods exist, and
 what the router will match. Attributes win on description. In practice:
 
-* A route attributes already describe is left to the attributes. The adapter's operation
-  stands aside whole, because the pipeline cannot yet fold two halves of one operation.
+* Attributes on a route's handler add to what the route gives. A handler that serves one route
+  and carries only `#[OA\Response]` gets the route's operation for the response to join. An
+  operation the attributes declare without a path or method gets the route's, where one route
+  matches its method. This needs the handler's class in the builder's sources, since only those
+  are read for attributes.
+* Where both describe a path parameter, it is folded by name and location. The attribute's
+  description wins. An attribute parameter with no schema takes the route's, type included.
+  One with a schema keeps it, except for `pattern`: the route's constraint is what the router
+  matches, so it replaces the attribute's. A route with no constraint leaves the attribute's
+  `pattern` as it is. A parameter referencing a component is left as it is, and so is one the
+  controller declares on its `#[OA\PathItem(parameters: ...)]`, or a parent class does. The
+  route adds no operation-level copy that would replace it, unless the attribute has its own to
+  fold into.
+* An operation declared on a method other than the handler, for the route's method and path,
+  is completed the same way. The attribute operation is the base, so one that only adds a tag
+  or a description still gets the route's path parameters.
 * A route nothing describes is contributed by the adapter.
+* A controller's `#[OA\PathItem(prefix: ...)]` is applied once. The route's full path already
+  contains it, so it is taken off before the pipeline adds it again. A route whose path does
+  not start with the prefix is left as it is, and still gets the prefix in front.
+* A handler serving several routes, such as a Laravel route with an optional parameter, folds
+  only the route its attribute names by method and path. The others are contributed whole, and
+  a bare `#[OA\Response]` on such a handler joins none of them.
+* A route with several methods, such as Laravel's `Route::match(['get', 'post'], ...)`, is one
+  route per method, all served by the same handler. An `#[OA\Operation]` that sets `method`
+  folds into the route for that method. Attributes that name no method, such as a bare
+  `#[OA\Response]` or an `#[OA\Operation]` without `method`, join none of them and are lost.
+  To describe every method, declare one operation per method, each with its own responses.
 * A route parameter's constraint, such as Laravel's `where('id', '[0-9]+')` or Slim's
   `{id:[0-9]+}`, becomes the parameter's `pattern`. The type is `integer` only where the
   pattern admits nothing else, and `string` otherwise.

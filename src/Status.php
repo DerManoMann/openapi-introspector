@@ -7,7 +7,7 @@ namespace Radebatz\OpenApi\Introspector;
  */
 enum Status: string
 {
-    /** Attributes describe it and a route serves it; the adapter's operation stood aside. */
+    /** Attributes describe it and a route serves it; what the route knows is folded into the attribute operation. */
     case Matched = 'matched';
     /** A route serves it and nothing else describes it; the adapter's operation went in. */
     case Introspected = 'introspected';
