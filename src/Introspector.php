@@ -102,7 +102,7 @@ final class Introspector
         foreach ($specification->operations as $operation) {
             $index = $this->routeOf($routes, $operation, $hierarchy);
             $route = $index !== null ? $routes->operation($index) : null;
-            $path = $route->path ?? ($operation->path !== null ? $this->join($this->prefixOf($operation, $hierarchy), $operation->path) : null);
+            $path = $route->path ?? $hierarchy->pathFor($operation);
 
             // incomplete operations are left to the pipeline, which reports them
             if ($path === null || $operation->method === null) {
@@ -166,7 +166,7 @@ final class Introspector
             if ($contributed->parameters !== null) {
                 $contributed->parameters = array_values(array_filter(
                     $contributed->parameters,
-                    fn (OA\Parameter $parameter): bool => !$this->isShared($components, $contributed, $hierarchy, (string) $parameter->name, (string) $parameter->in),
+                    fn (OA\Parameter $parameter): bool => !$this->isShared($hierarchy, $contributed, $components->parameterKey($parameter)),
                 )) ?: null;
             }
             $specification->add($contributed);
@@ -205,7 +205,7 @@ final class Introspector
         $reflector = $operation->getReflector();
         // the path the operation compiles to; the translator sets a route's full path, while an
         // attribute under a prefixed controller is written relative to the prefix
-        $full = $operation->path !== null ? $this->join($this->prefixOf($operation, $hierarchy), $operation->path) : null;
+        $full = $hierarchy->pathFor($operation);
 
         // first, the routes its own method handles, for the same HTTP method
         $candidates = array_values(array_filter(
@@ -249,14 +249,13 @@ final class Introspector
         $operation->operationId ??= $route->operationId;
 
         foreach ($route->parameters ?? [] as $parameter) {
-            $name = (string) $parameter->name;
-            $in = (string) $parameter->in;
-            $existing = $this->findParameter($components, $operation->parameters, $name, $in);
+            $key = $components->parameterKey($parameter);
+            $existing = $this->findParameter($components, $operation->parameters, $key);
 
             // `null` is a reference to a component, which belongs to every operation using it
             // and is not changed for one of them
             if ($existing === false) {
-                if ($this->isShared($components, $operation, $hierarchy, $name, $in)) {
+                if ($this->isShared($hierarchy, $operation, $key)) {
                     continue;
                 }
 
@@ -273,31 +272,23 @@ final class Introspector
     }
 
     /**
-     * The parameter a list already has for a name and location: the inline one to fold into,
-     * `null` for a reference to a component, which is left alone, or `false` for none.
+     * The parameter a list already has for a key: the inline one to fold into, `null` for a
+     * reference to a component, which is left alone, or `false` for none.
+     *
+     * The key is swagger-php's, which reads a reference's name and location off its component,
+     * and a missing name off the PHP parameter, since the augmenters that fill both in run later.
      *
      * @param list<OA\Parameter>|null $parameters
      */
-    private function findParameter(ComponentIndex $components, ?array $parameters, string $name, string $in): OA\Parameter|false|null
+    private function findParameter(ComponentIndex $components, ?array $parameters, ?string $key): OA\Parameter|false|null
     {
+        if ($key === null) {
+            return false;
+        }
+
         foreach ($parameters ?? [] as $parameter) {
-            // the resolver only resolves class references, so a reference to a component still
-            // carries no name or location: read them off the component it points to
-            if (is_string($parameter->ref)) {
-                $component = $components->findParameter($parameter->ref);
-                if ($component instanceof OA\Parameter && $component->name === $name && $component->in === $in) {
-                    return null;
-                }
-
-                continue;
-            }
-
-            // names are filled in from the PHP parameter by a later augmenter, so read it here
-            $reflector = $parameter->getReflector();
-            $parameterName = $parameter->name ?? ($reflector instanceof \ReflectionParameter ? $reflector->getName() : null);
-
-            if ($parameterName === $name && $parameter->in === $in) {
-                return $parameter;
+            if ($components->parameterKey($parameter) === $key) {
+                return $parameter->ref !== null ? null : $parameter;
             }
         }
 
@@ -311,15 +302,9 @@ final class Introspector
      * parameter of the same name and location would replace one of them whole, so the route's
      * would win over the attribute's.
      */
-    private function isShared(ComponentIndex $components, OA\Operation $operation, PathItemHierarchy $hierarchy, string $name, string $in): bool
+    private function isShared(PathItemHierarchy $hierarchy, OA\Operation $operation, ?string $key): bool
     {
-        foreach ($hierarchy->forOperation($operation) as $pathItem) {
-            if ($this->findParameter($components, $pathItem->parameters, $name, $in) !== false) {
-                return true;
-            }
-        }
-
-        return false;
+        return $key !== null && isset($hierarchy->parametersFor($operation)[$key]);
     }
 
     /**
@@ -357,7 +342,7 @@ final class Introspector
      */
     private function relativise(OA\Operation $operation, PathItemHierarchy $hierarchy): void
     {
-        $prefix = $this->prefixOf($operation, $hierarchy);
+        $prefix = $hierarchy->prefixFor($operation);
         $path = (string) $operation->path;
 
         // a route outside its controller's prefix cannot be expressed under it; the path is left
@@ -365,22 +350,6 @@ final class Introspector
         if ($prefix !== '' && ($path === $prefix || str_starts_with($path, $prefix . '/'))) {
             $operation->path = '/' . ltrim(substr($path, strlen($prefix)), '/');
         }
-    }
-
-    /**
-     * The prefix the pipeline will put in front of an operation's path, composed the way
-     * swagger-php's `Augmenter\PathItems` composes it.
-     */
-    private function prefixOf(OA\Operation $operation, PathItemHierarchy $hierarchy): string
-    {
-        $parts = [];
-        foreach ($hierarchy->forOperation($operation) as $pathItem) {
-            if ($pathItem->prefix !== null && ($part = trim($pathItem->prefix, '/')) !== '') {
-                $parts[] = $part;
-            }
-        }
-
-        return $parts !== [] ? '/' . implode('/', $parts) : '';
     }
 
     /**
@@ -404,16 +373,5 @@ final class Introspector
         }
 
         return $copy;
-    }
-
-    private function join(string $prefix, string $path): string
-    {
-        if ($prefix === '') {
-            return $path;
-        }
-
-        $path = ltrim($path, '/');
-
-        return $path !== '' ? $prefix . '/' . $path : $prefix;
     }
 }

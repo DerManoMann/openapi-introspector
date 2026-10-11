@@ -42,7 +42,7 @@ Supported frameworks:
 ## Requirements
 
 * PHP 8.2 or higher
-* `zircote/swagger-php` 6.12 or higher, the first release with `Builder::withSpecification()`
+* `zircote/swagger-php` 6.13 or higher, for the `PathItem` chain helpers and `ComponentIndex::parameterKey()`
 
 ## Usage
 

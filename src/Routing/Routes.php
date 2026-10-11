@@ -3,6 +3,7 @@
 namespace Radebatz\OpenApi\Introspector\Routing;
 
 use OpenApi\Spec as OA;
+use OpenApi\Utils\SourceLocation;
 use Radebatz\OpenApi\Introspector\AdapterInterface;
 use Radebatz\OpenApi\Introspector\Inventory\Entry;
 
@@ -68,7 +69,7 @@ final class Routes
      */
     public static function handlerOf(\ReflectionMethod $method): string
     {
-        return $method->getDeclaringClass()->getName() . '::' . $method->getName();
+        return (string) SourceLocation::fromReflector($method)->qualifiedMethod();
     }
 
     /**
