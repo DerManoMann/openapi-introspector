@@ -20,7 +20,7 @@ use Radebatz\OpenApi\Introspector\Tests\Fixtures\UsersController;
 /**
  * Attributes on a route's handler add to what the route gives: the route supplies existence,
  * method, path and path parameters, the attributes the rest, and the attribute wins on a field
- * both set.
+ * both set, except a path parameter's `pattern`, which is what the router matches.
  */
 final class FoldTest extends TestCase
 {
@@ -53,6 +53,30 @@ final class FoldTest extends TestCase
         $this->assertSame('The user id', $parameter['description']);
         $this->assertSame('string', $parameter['schema']['type'], "the attribute's schema wins");
         $this->assertSame('[0-9]+', $parameter['schema']['pattern'], "the route's pattern survives where the attribute has none");
+    }
+
+    public function testTheRoutesPatternWinsOverTheAttributes(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->patch('users/{id}', [RoutedController::class, 'rename'])->where('id', '[0-9]+');
+
+        [$document] = $this->build($router, RoutedController::class);
+
+        $schema = $document['paths']['/users/{id}']['patch']['parameters'][0]['schema'];
+        $this->assertSame('[0-9]+', $schema['pattern'], "the router matches the route's pattern, not the attribute's");
+        $this->assertSame('integer', $schema['type'], "the attribute's type still wins");
+    }
+
+    public function testAnUnconstrainedRouteLeavesTheAttributesPattern(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->patch('users/{id}', [RoutedController::class, 'rename']);
+
+        [$document] = $this->build($router, RoutedController::class);
+
+        $schema = $document['paths']['/users/{id}']['patch']['parameters'][0]['schema'];
+        $this->assertSame('[1-9][0-9]*', $schema['pattern']);
+        $this->assertSame('integer', $schema['type']);
     }
 
     public function testAnOperationDeclaredOnAnotherMethodIsCompletedFromTheRoute(): void

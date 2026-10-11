@@ -202,10 +202,12 @@ what the router will match. Attributes win on description. In practice:
   are read for attributes.
 * Where both describe a path parameter, it is folded by name and location. The attribute's
   description wins. An attribute parameter with no schema takes the route's, type included.
-  One with a schema keeps it, and gets the route's `pattern` where it has none. A parameter
-  referencing a component is left as it is, and so is one the controller declares on its
-  `#[OA\PathItem(parameters: ...)]`, or a parent class does. The route adds no operation-level
-  copy that would replace it, unless the attribute has its own to fold into.
+  One with a schema keeps it, except for `pattern`: the route's constraint is what the router
+  matches, so it replaces the attribute's. A route with no constraint leaves the attribute's
+  `pattern` as it is. A parameter referencing a component is left as it is, and so is one the
+  controller declares on its `#[OA\PathItem(parameters: ...)]`, or a parent class does. The
+  route adds no operation-level copy that would replace it, unless the attribute has its own to
+  fold into.
 * An operation declared on a method other than the handler, for the route's method and path,
   is completed the same way. The attribute operation is the base, so one that only adds a tag
   or a description still gets the route's path parameters.

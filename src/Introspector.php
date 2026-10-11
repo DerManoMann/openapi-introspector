@@ -236,10 +236,11 @@ final class Introspector
     /**
      * Folds what the route knows into an assembled operation, where the operation leaves it out.
      *
-     * The operation is the base and wins on every field it sets. From the route it takes the
-     * `operationId` and the path parameters: a parameter it lacks is added, and one it has gets the
-     * route's schema where it has none, or the route's `pattern` where its schema has none. A
-     * parameter its controller's path items declare is left to them.
+     * The operation is the base and wins on every field it sets but one. From the route it takes
+     * the `operationId` and the path parameters: a parameter it lacks is added, and one it has gets
+     * the route's schema where it has none. Where it has one, the route's `pattern` replaces its
+     * own, since that is what the router matches. A parameter its controller's path items declare
+     * is left to them.
      */
     private function complete(ComponentIndex $components, OA\Operation $operation, OA\Operation $route, PathItemHierarchy $hierarchy): void
     {
@@ -267,8 +268,10 @@ final class Introspector
             } elseif ($existing instanceof OA\Parameter && $parameter->schema instanceof Schema) {
                 if (!$existing->schema instanceof Schema) {
                     $existing->schema = self::copy($parameter->schema);
-                } else {
-                    $existing->schema->pattern ??= $parameter->schema->pattern;
+                } elseif ($parameter->schema->pattern !== null) {
+                    // the pattern is what the router matches, so the route's wins; the type is
+                    // only guessed from it, so the attribute's stays
+                    $existing->schema->pattern = $parameter->schema->pattern;
                 }
             }
         }

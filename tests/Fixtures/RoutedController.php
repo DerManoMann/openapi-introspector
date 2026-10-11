@@ -26,6 +26,14 @@ class RoutedController
     ): void {
     }
 
+    #[OA\Operation\Patch(summary: 'Rename a user')]
+    #[OA\Response(response: 204, description: 'Renamed')]
+    public function rename(
+        #[OA\Parameter\Path(schema: new OA\Schema(type: 'integer', pattern: '[1-9][0-9]*'))]
+        int $id,
+    ): void {
+    }
+
     #[OA\Operation\Delete(parameters: [new OA\Parameter(ref: '#/components/parameters/UserId')])]
     #[OA\Response(response: 204, description: 'Deleted')]
     public function destroy(int $id): void
