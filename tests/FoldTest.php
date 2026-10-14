@@ -13,6 +13,7 @@ use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Introspector;
 use Radebatz\OpenApi\Introspector\Status;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\PrefixedController;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\RenamedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\RoutedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\SharedParameterController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\UsersController;
@@ -77,6 +78,72 @@ final class FoldTest extends TestCase
         $schema = $document['paths']['/users/{id}']['patch']['parameters'][0]['schema'];
         $this->assertSame('[1-9][0-9]*', $schema['pattern']);
         $this->assertSame('integer', $schema['type']);
+    }
+
+    public function testARenamedPlaceholderFoldsIntoTheAttributesParameter(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('events/{event}', [RenamedController::class, 'show'])->where('event', '[0-9]+');
+
+        [$document, $introspector] = $this->build($router, RenamedController::class);
+
+        $operation = $document['paths']['/events/{id}']['get'];
+        $this->assertCount(1, $operation['parameters'], "no parameter under the route's name");
+        $parameter = $operation['parameters'][0];
+        $this->assertSame('id', $parameter['name']);
+        $this->assertSame('The event id', $parameter['description']);
+        $this->assertSame('[0-9]+', $parameter['schema']['pattern'], "the route's pattern, by position");
+        $this->assertSame(Status::Matched, $introspector->inventory()->get('get', '/events/{event}')?->status);
+    }
+
+    public function testARenamedPlaceholderIsAddedUnderTheAttributesName(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->delete('events/{event}', [RenamedController::class, 'destroy'])->where('event', '[0-9]+');
+
+        [$document] = $this->build($router, RenamedController::class);
+
+        $parameters = $document['paths']['/events/{id}']['delete']['parameters'];
+        $this->assertSame(['id'], array_column($parameters, 'name'), 'the name the path gives it');
+        $this->assertSame('[0-9]+', $parameters[0]['schema']['pattern']);
+    }
+
+    public function testAPlaceholderTheAttributesPathLacksIsNotAdded(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('reports/{year}/{id}', [RenamedController::class, 'report']);
+
+        [$document] = $this->build($router, RenamedController::class);
+
+        $parameters = $document['paths']['/reports/{id}']['get']['parameters'];
+        $this->assertSame(['id'], array_column($parameters, 'name'), 'a path parameter the path does not contain would be invalid');
+    }
+
+    public function testAnOperationOnAnotherMethodIsFoundWhateverItsPlaceholdersAreCalled(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('accounts/{account}', [UsersController::class, 'show'])->where('account', '[0-9]+');
+
+        [$document, $introspector] = $this->build($router, RoutedController::class);
+
+        $this->assertArrayNotHasKey('/accounts/{account}', $document['paths'], 'the route is not added beside the attribute operation');
+        $operation = $document['paths']['/accounts/{id}']['get'];
+        $this->assertSame(['Accounts'], $operation['tags']);
+        $this->assertSame(['id'], array_column($operation['parameters'], 'name'));
+        $this->assertSame('[0-9]+', $operation['parameters'][0]['schema']['pattern']);
+        $this->assertSame(Status::Matched, $introspector->inventory()->get('get', '/accounts/{account}')?->status);
+    }
+
+    public function testRoutesOfOneShapeToldApartByTheirConstraintsAreBothKept(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->delete('orders/{order_id}', [UsersController::class, 'show'])->where('order_id', '[0-9]+');
+        $router->delete('orders/{hash}', [UsersController::class, 'index'])->where('hash', '[a-z]+');
+
+        [, $introspector] = $this->build($router, RenamedController::class);
+
+        $this->assertSame(Status::Introspected, $introspector->inventory()->get('delete', '/orders/{order_id}')?->status);
+        $this->assertSame(Status::Introspected, $introspector->inventory()->get('delete', '/orders/{hash}')?->status);
     }
 
     public function testAnOperationDeclaredOnAnotherMethodIsCompletedFromTheRoute(): void

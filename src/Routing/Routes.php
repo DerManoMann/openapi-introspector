@@ -29,6 +29,9 @@ final class Routes
     /** @var array<string, int> */
     private array $keys = [];
 
+    /** @var array<string, list<int>> */
+    private array $shapes = [];
+
     /**
      * @param iterable<AdapterInterface> $adapters
      *
@@ -50,6 +53,7 @@ final class Routes
 
                 $index = count($this->operations);
                 $this->keys[$key] = $index;
+                $this->shapes[Entry::keyOf($operation->method, self::shapeOf($operation->path))][] = $index;
                 $this->operations[] = $operation;
                 $this->adapters[] = $adapter::class;
 
@@ -73,6 +77,26 @@ final class Routes
     }
 
     /**
+     * A path with its placeholder names left out, so paths differing only in those compare equal.
+     */
+    public static function shapeOf(string $path): string
+    {
+        return (string) preg_replace('/\{[^}\/]+\}/', '{}', $path);
+    }
+
+    /**
+     * The names of a path's placeholders, in the order they appear.
+     *
+     * @return list<string>
+     */
+    public static function placeholdersOf(string $path): array
+    {
+        preg_match_all('/\{([^}\/]+)\}/', $path, $matches);
+
+        return $matches[1];
+    }
+
+    /**
      * @return list<int>
      */
     public function indexes(): array
@@ -92,10 +116,20 @@ final class Routes
 
     /**
      * The index of the route for a method and path, if one serves it.
+     *
+     * Where none has that exact path, the one route of the same shape is taken, whatever its
+     * placeholders are called. Several of one shape are told apart by their constraints, such as
+     * `{order_id}` and `{hash}`, which a path alone cannot do, so then there is none.
      */
     public function forKey(string $method, string $path): ?int
     {
-        return $this->keys[Entry::keyOf($method, $path)] ?? null;
+        if (isset($this->keys[$key = Entry::keyOf($method, $path)])) {
+            return $this->keys[$key];
+        }
+
+        $shaped = $this->shapes[Entry::keyOf($method, self::shapeOf($path))] ?? [];
+
+        return count($shaped) === 1 ? $shaped[0] : null;
     }
 
     /**
