@@ -316,13 +316,18 @@ final class Introspector
     /**
      * Whether attributes on the handler, rather than only the route, describe the operation.
      *
-     * An operation the translator added carries no attributes of its own, so this reads them off
-     * the method it sits on: a bare `#[OA\Response]` there, or an `OA\Parameter` on one of its
-     * parameters, means attributes contributed. Reading it off the method needs no mark on the
-     * operation, which the pipeline clones and changes as it runs.
+     * Any operation the translator did not add is described: attributes made it, including
+     * classic ones, which hybrid mode assembles after the translator has run. The translator's
+     * own operation carries no attributes, so for it this reads them off the method it sits on:
+     * a bare `#[OA\Response]` there, or an `OA\Parameter` on one of its parameters, means
+     * attributes contributed.
      */
     private function isDescribed(OA\Operation $operation): bool
     {
+        if ($operation->getMeta(RouteTranslator::class) !== true) {
+            return true;
+        }
+
         $reflector = $operation->getReflector();
         // without a handler method, attributes are all that can have made it
         if (!$reflector instanceof \ReflectionMethod) {
