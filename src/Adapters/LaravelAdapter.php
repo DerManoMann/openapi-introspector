@@ -9,6 +9,7 @@ use OpenApi\Spec as OA;
 use Radebatz\OpenApi\Introspector\AdapterInterface;
 use Radebatz\OpenApi\Introspector\Routing\Constraint;
 use Radebatz\OpenApi\Introspector\Routing\Handler;
+use Radebatz\OpenApi\Introspector\Routing\Prefix;
 
 /**
  * Reads the routes a Laravel router holds.
@@ -18,7 +19,8 @@ use Radebatz\OpenApi\Introspector\Routing\Handler;
  * artefact of `GET`, and a fallback route is not an endpoint.
  *
  * It takes the router, its route collection, or any iterable of routes, so a caller that wants
- * only some of them filters first and hands over what is left.
+ * only some of them filters first and hands over what is left. A `prefix` comes off every route
+ * path that starts with it, for a document whose paths are relative to a server URL carrying it.
  */
 final readonly class LaravelAdapter implements AdapterInterface
 {
@@ -30,6 +32,7 @@ final readonly class LaravelAdapter implements AdapterInterface
         private bool $nameAsOperationId = false,
         private Handler $handler = new Handler(),
         private Constraint $constraint = new Constraint(),
+        private string $prefix = '',
     ) {
     }
 
@@ -52,7 +55,7 @@ final readonly class LaravelAdapter implements AdapterInterface
             foreach ($this->paths($route) as [$path, $parameters]) {
                 foreach ($this->methods($route) as $method) {
                     $operation = new OA\Operation(
-                        path: $path,
+                        path: Prefix::strip($this->prefix, $path),
                         method: $method,
                         operationId: $name,
                         parameters: $this->parameters($parameters, $route->wheres),

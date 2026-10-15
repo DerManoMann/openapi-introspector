@@ -146,6 +146,19 @@ $routes = array_filter(
 );
 ```
 
+### Paths relative to a server
+
+Attribute paths are often written relative to a server URL that carries a prefix: `/users` under
+`https://example.com/api`, while the router serves `/api/users`. Both adapters take that prefix,
+and take it off every route path that starts with it:
+
+```php
+$adapter = new LaravelAdapter($routes, prefix: '/api');
+```
+
+Only whole segments come off, so `/apis` keeps its path, and a route outside the prefix is left as
+it is. The inventory then reports the same paths the document has.
+
 ### Generating for L5-Swagger
 
 [L5-Swagger](https://github.com/DarkaOnLine/L5-Swagger) builds its document itself, with no
@@ -245,9 +258,9 @@ The second output. One entry per method and path, with a status:
 one of the two, and the document alone cannot show it.
 
 `Conflict` usually means attribute paths are written relative to a server URL (`/users` under
-`https://example.com/api`) while the routes carry the prefix, and a web route happens to sit at the
-documented path. The documented operation is kept, and the builder's logger gets a warning naming
-both.
+`https://example.com/api`), and a web route sits at the documented path. The documented operation
+is kept, and the builder's logger gets a warning naming both. Choosing only the API routes avoids
+it, with the adapter's `prefix` to match the server URL.
 
 ### Extending
 
