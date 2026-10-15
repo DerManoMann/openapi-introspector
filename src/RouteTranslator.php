@@ -14,6 +14,9 @@ use OpenApi\Spec as OA;
  * leaves them out. Nothing else is filled here: the route's parameters wait until nesting is
  * done, and {@see Introspector::introspect()} folds them in then.
  *
+ * An operation it creates carries its class as a `meta` key. Attributes it cannot see, such as
+ * classic ones that hybrid mode assembles later, describe the route on an operation without it.
+ *
  * Registered last, so the default translators have already created the attributes it looks at.
  *
  * @internal
@@ -56,7 +59,7 @@ final class RouteTranslator extends AbstractAttributeTranslator
             // attributes have nested, so the two can be folded by name rather than doubled
             $route = $routes->operation($candidates[0]);
 
-            return [new OA\Operation(path: $route->path, method: $route->method), ...$translated];
+            return [(new OA\Operation(path: $route->path, method: $route->method))->setMeta(self::class, true), ...$translated];
         }
 
         // the attributes declare operations already: fill in what they leave out, provided
