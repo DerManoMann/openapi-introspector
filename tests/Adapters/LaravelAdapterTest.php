@@ -121,6 +121,22 @@ final class LaravelAdapterTest extends TestCase
         $this->assertSame('/api/users', $operations[0]->path);
     }
 
+    public function testAPrefixComesOffThePathsThatStartWithIt(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('api/users', [UsersController::class, 'index']);
+        $router->get('api', [UsersController::class, 'index']);
+        $router->get('apis', [UsersController::class, 'index']);
+        $router->get('dashboard', [UsersController::class, 'index']);
+
+        $paths = array_map(
+            static fn (OA\Operation $operation): ?string => $operation->path,
+            $this->operations(new LaravelAdapter($router, prefix: '/api')),
+        );
+
+        $this->assertSame(['/users', '/', '/apis', '/dashboard'], $paths, 'whole segments only, and a path without it is left alone');
+    }
+
     /**
      * @return list<OA\Operation>
      */

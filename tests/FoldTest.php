@@ -13,6 +13,7 @@ use Psr\Log\AbstractLogger;
 use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Introspector;
 use Radebatz\OpenApi\Introspector\Status;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\AttributedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\PrefixedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\RenamedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\RoutedController;
@@ -213,6 +214,21 @@ final class FoldTest extends TestCase
 
         $this->assertSame('List accounts', $document['paths']['/accounts']['get']['summary'], "not replaced by the translator's operation");
         $this->assertSame(Status::Conflict, $introspector->inventory()->get('get', '/accounts')?->status);
+    }
+
+    public function testAPrefixMatchesAPathRelativeToTheServerAwayFromItsHandler(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('api/users', [UsersController::class, 'index']);
+        $router->get('api/ping', [UsersController::class, 'show']);
+
+        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router, prefix: '/api'));
+        $document = $introspector->register($this->builder(AttributedController::class))->build()->toArray();
+
+        $this->assertSame('All the users', $document['paths']['/users']['get']['summary']);
+        $this->assertSame(Status::Matched, $introspector->inventory()->get('get', '/users')?->status, 'documented on another method, matched by its path');
+        $this->assertArrayHasKey('/ping', $document['paths'], 'an added route is relative to the server too');
+        $this->assertArrayNotHasKey('/api/ping', $document['paths']);
     }
 
     public function testAnOperationDeclaredOnAnotherMethodIsCompletedFromTheRoute(): void

@@ -6,6 +6,7 @@ use OpenApi\Spec as OA;
 use Radebatz\OpenApi\Introspector\AdapterInterface;
 use Radebatz\OpenApi\Introspector\Routing\Constraint;
 use Radebatz\OpenApi\Introspector\Routing\Handler;
+use Radebatz\OpenApi\Introspector\Routing\Prefix;
 use Slim\Interfaces\RouteCollectorInterface;
 use Slim\Interfaces\RouteInterface;
 
@@ -17,7 +18,8 @@ use Slim\Interfaces\RouteInterface;
  * callable carries its method's reflector; a closure is yielded bare.
  *
  * It takes the route collector or any iterable of routes, so a caller that wants only some of
- * them filters first and hands over what is left.
+ * them filters first and hands over what is left. A `prefix` comes off every route path that
+ * starts with it, for a document whose paths are relative to a server URL carrying it.
  */
 final readonly class SlimAdapter implements AdapterInterface
 {
@@ -29,6 +31,7 @@ final readonly class SlimAdapter implements AdapterInterface
         private bool $nameAsOperationId = false,
         private Handler $handler = new Handler(),
         private Constraint $constraint = new Constraint(),
+        private string $prefix = '',
     ) {
     }
 
@@ -45,7 +48,7 @@ final readonly class SlimAdapter implements AdapterInterface
 
                 foreach ($this->methods($route) as $method) {
                     $operation = new OA\Operation(
-                        path: $path,
+                        path: Prefix::strip($this->prefix, $path),
                         method: $method,
                         operationId: $name,
                         parameters: $this->parameters($parameters),

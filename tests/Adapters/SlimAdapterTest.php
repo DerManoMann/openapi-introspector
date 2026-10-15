@@ -107,13 +107,24 @@ final class SlimAdapterTest extends TestCase
         $this->assertSame('/api/users', $operations[0]->path);
     }
 
+    public function testAPrefixComesOffThePathsThatStartWithIt(): void
+    {
+        $app = AppFactory::create();
+        $app->get('/api/users[/{id:[0-9]+}]', [UsersController::class, 'show']);
+        $app->get('/dashboard', [UsersController::class, 'index']);
+
+        $paths = array_map(static fn (OA\Operation $operation): ?string => $operation->path, $this->operations($app, prefix: 'api'));
+
+        $this->assertSame(['/users', '/users/{id}', '/dashboard'], $paths);
+    }
+
     /**
      * @param App<ContainerInterface|null> $app
      *
      * @return list<OA\Operation>
      */
-    private function operations(App $app, bool $nameAsOperationId = false): array
+    private function operations(App $app, bool $nameAsOperationId = false, string $prefix = ''): array
     {
-        return iterator_to_array((new SlimAdapter($app->getRouteCollector(), $nameAsOperationId))->operations(), false);
+        return iterator_to_array((new SlimAdapter($app->getRouteCollector(), $nameAsOperationId, prefix: $prefix))->operations(), false);
     }
 }
