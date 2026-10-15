@@ -217,11 +217,17 @@ final class Introspector
         ));
 
         // a handler serving several routes, such as one with an optional parameter: the
-        // attribute's path picks one, compared both as written and with the prefix in front
+        // attribute's path picks one, compared both as written and with the prefix in front,
+        // and failing that by shape, since the two may name their placeholders differently
         if (count($candidates) > 1 && $operation->path !== null) {
-            $candidates = array_values(array_filter(
+            $paths = array_filter([$operation->path, $full]);
+            $exact = array_values(array_filter(
                 $candidates,
-                static fn (int $index): bool => in_array($routes->operation($index)->path, [$operation->path, $full], true),
+                static fn (int $index): bool => in_array($routes->operation($index)->path, $paths, true),
+            ));
+            $candidates = $exact !== [] ? $exact : array_values(array_filter(
+                $candidates,
+                static fn (int $index): bool => in_array(Routes::shapeOf((string) $routes->operation($index)->path), array_map(Routes::shapeOf(...), $paths), true),
             ));
         }
 
@@ -237,8 +243,9 @@ final class Introspector
      * Folds what the route knows into an assembled operation, where the operation leaves it out.
      *
      * The operation is the base and wins on every field it sets but one. From the route it takes
-     * the `operationId` and the path parameters: a parameter it lacks is added, and one it has gets
-     * the route's schema where it has none. Where it has one, the route's `pattern` replaces its
+     * the `operationId` and the path parameters, mapped onto its own placeholders by position, so a
+     * route's `{event}` is the attribute's `{id}`: a parameter it lacks is added, and one it has
+     * gets the route's schema where it has none. Where it has one, the route's `pattern` replaces its
      * own, since that is what the router matches. A parameter its controller's path items declare
      * is left to them.
      */
@@ -251,8 +258,22 @@ final class Introspector
         }
 
         $operation->operationId ??= $route->operationId;
+        $placeholders = $this->placeholderNames($hierarchy->pathFor($operation) ?? $operation->path ?? (string) $route->path, (string) $route->path);
 
         foreach ($route->parameters ?? [] as $parameter) {
+            // a path parameter takes the name the operation's own path gives it; one the
+            // operation's path has no placeholder for is not added
+            if ($parameter->in === 'path' && $parameter->name !== null) {
+                $placeholder = $placeholders[$parameter->name] ?? null;
+                if ($placeholder === null) {
+                    continue;
+                }
+                if ($placeholder !== $parameter->name) {
+                    $parameter = self::copy($parameter);
+                    $parameter->name = $placeholder;
+                }
+            }
+
             $key = $components->parameterKey($parameter);
             $existing = $this->findParameter($components, $operation->parameters, $key);
 
@@ -275,6 +296,30 @@ final class Introspector
                 }
             }
         }
+    }
+
+    /**
+     * The route's placeholder names mapped onto an operation's, by position.
+     *
+     * Both paths describe one endpoint, so where they have the same number of placeholders the
+     * nth of one is the nth of the other, whatever each calls it: Laravel names one for route
+     * model binding (`{event}`) or by type (`{integer}`), while the attribute says `{id}`. Where
+     * the counts differ, only the names both paths use are mapped.
+     *
+     * @return array<string, string> route name → operation name
+     */
+    private function placeholderNames(string $operationPath, string $routePath): array
+    {
+        $ours = Routes::placeholdersOf($operationPath);
+        $theirs = Routes::placeholdersOf($routePath);
+
+        if (count($ours) === count($theirs)) {
+            return array_combine($theirs, $ours);
+        }
+
+        $shared = array_values(array_intersect($theirs, $ours));
+
+        return array_combine($shared, $shared);
     }
 
     /**
