@@ -5,25 +5,30 @@ namespace Radebatz\OpenApi\Introspector;
 use OpenApi\Augmenter\Group;
 use OpenApi\Specification;
 use OpenApi\Utils\PipeInterface;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 
 /**
  * Runs the introspection as the first augmenter, so every other augmenter sees the operations
- * already completed from their routes.
+ * already completed from their routes. It takes the pipeline's logger for what the introspection
+ * reports.
  *
  * @implements PipeInterface<Specification>
  *
  * @internal
  */
-final readonly class IntrospectionAugmenter implements PipeInterface
+final class IntrospectionAugmenter implements PipeInterface, LoggerAwareInterface
 {
-    public function __construct(private Introspector $introspector)
+    use LoggerAwareTrait;
+
+    public function __construct(private readonly Introspector $introspector)
     {
     }
 
     public function __invoke(mixed $payload): mixed
     {
         if ($payload instanceof Specification) {
-            $this->introspector->introspect($payload);
+            $this->introspector->introspect($payload, $this->logger);
         }
 
         return null;

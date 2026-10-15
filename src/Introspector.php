@@ -12,6 +12,7 @@ use OpenApi\Specification\PathItemHierarchy;
 use OpenApi\Utils\AttributeFactory;
 use OpenApi\Utils\Pipeline;
 use OpenApi\Utils\TypedList;
+use Psr\Log\LoggerInterface;
 use Radebatz\OpenApi\Introspector\Inventory\Entry;
 use Radebatz\OpenApi\Introspector\Routing\Routes;
 
@@ -83,10 +84,12 @@ final class Introspector
      *    serves, or else the one for its method and full path.
      * 2. Complete each paired operation from its route. Where a route has more than one operation,
      *    one only the translator made stands aside, so attributes keep the final say.
-     * 3. Contribute every route no operation was paired with, as the adapter yielded it.
+     * 3. Contribute every route no operation was paired with, as the adapter yielded it, unless
+     *    an attribute operation for another route already sits at its path. That one would be
+     *    replaced, so the route is left out, reported to the logger and recorded as a conflict.
      * 4. Record what attributes describe and no route serves as unrouted.
      */
-    public function introspect(Specification $specification): Inventory
+    public function introspect(Specification $specification, ?LoggerInterface $logger = null): Inventory
     {
         $inventory = new Inventory();
         $routes = $this->routes();
@@ -102,6 +105,8 @@ final class Introspector
         $assembled = [];
         /** @var array<string, array{string, string}> $described method and path, by key */
         $described = [];
+        /** @var array<string, string> $documented the path each described operation compiles to, by method and shape */
+        $documented = [];
         foreach ($specification->operations as $operation) {
             $index = $this->routeOf($routes, $operation, $hierarchy);
             $route = $index !== null ? $routes->operation($index) : null;
@@ -119,6 +124,8 @@ final class Introspector
 
             if ($isDescribed) {
                 $described[$key] = [$operation->method, $path];
+                $compiled = $hierarchy->pathFor($operation) ?? $path;
+                $documented[Entry::keyOf($operation->method, Routes::shapeOf($compiled))] = $compiled;
             }
         }
 
@@ -135,6 +142,14 @@ final class Introspector
             // attributes on another method describe the same route; if they do, or another
             // operation already claimed the route, the translator's one is redundant
             if (!$isDescribed && (isset($claimed[$index]) || isset($described[$key]))) {
+                $standingAside[] = $operation;
+
+                continue;
+            }
+
+            // nor may it replace an attribute operation documenting another route at its path;
+            // the route stays unclaimed, and step 3 reports the conflict
+            if (!$isDescribed && isset($documented[Entry::keyOf($operation->method, Routes::shapeOf((string) $routes->operation($index)->path))])) {
                 $standingAside[] = $operation;
 
                 continue;
@@ -163,6 +178,23 @@ final class Introspector
             }
 
             $route = $routes->operation($index);
+
+            // an attribute operation already sits at the route's path, documenting another
+            // route: adding this one would replace it, so it is left out and reported
+            $taken = $documented[Entry::keyOf((string) $route->method, Routes::shapeOf((string) $route->path))] ?? null;
+            if ($taken !== null) {
+                $logger?->warning(sprintf(
+                    'Route %s %s is not added: attributes document %s %s for another route',
+                    strtoupper((string) $route->method),
+                    $route->path,
+                    strtoupper((string) $route->method),
+                    $taken,
+                ));
+                $inventory->record(new Entry((string) $route->method, (string) $route->path, Status::Conflict, $routes->adapter($index)));
+
+                continue;
+            }
+
             $contributed = self::copy($route);
             $this->relativise($contributed, $hierarchy);
             // the same rule as for a completed operation: what the path items declare is theirs
@@ -216,19 +248,14 @@ final class Introspector
             static fn (int $index): bool => $routes->operation($index)->method === $operation->method,
         ));
 
-        // a handler serving several routes, such as one with an optional parameter: the
-        // attribute's path picks one, compared both as written and with the prefix in front,
-        // and failing that by shape, since the two may name their placeholders differently
-        if (count($candidates) > 1 && $operation->path !== null) {
-            $paths = array_filter([$operation->path, $full]);
-            $exact = array_values(array_filter(
-                $candidates,
-                static fn (int $index): bool => in_array($routes->operation($index)->path, $paths, true),
-            ));
-            $candidates = $exact !== [] ? $exact : array_values(array_filter(
-                $candidates,
-                static fn (int $index): bool => in_array(Routes::shapeOf((string) $routes->operation($index)->path), array_map(Routes::shapeOf(...), $paths), true),
-            ));
+        // where the attribute gives a path, the handler's routes have to agree with it: one
+        // handler may serve several routes, such as one with an optional parameter, and one
+        // method may carry operations for routes other handlers serve. Compared as written and
+        // with the prefix in front, then by shape, since the two may name their placeholders
+        // differently, and last as the end of the route's path, for an attribute path written
+        // relative to a server URL that carries the route's leading segments
+        if ($candidates !== [] && $operation->path !== null) {
+            $candidates = $this->agreeing($routes, $candidates, array_values(array_filter([$operation->path, $full])));
         }
 
         if (count($candidates) === 1) {
@@ -296,6 +323,60 @@ final class Introspector
                 }
             }
         }
+    }
+
+    /**
+     * The candidate routes whose path agrees with one of an operation's: the same path where any
+     * has it, or else one whose segments end with the operation's.
+     *
+     * @param list<int>    $candidates
+     * @param list<string> $paths
+     *
+     * @return list<int>
+     */
+    private function agreeing(Routes $routes, array $candidates, array $paths): array
+    {
+        $exact = array_values(array_filter(
+            $candidates,
+            static fn (int $index): bool => in_array($routes->operation($index)->path, $paths, true),
+        ));
+        if ($exact !== []) {
+            return $exact;
+        }
+
+        return array_values(array_filter(
+            $candidates,
+            static fn (int $index): bool => array_filter($paths, static fn (string $path): bool => self::endsWith((string) $routes->operation($index)->path, $path)) !== [],
+        ));
+    }
+
+    /**
+     * Whether a route's path ends with an operation's, segment by segment.
+     *
+     * Two segments agree where they are equal or the route's is a placeholder: the two may name a
+     * placeholder differently, and an attribute may write the one value a route constrains its
+     * placeholder to, such as `me`. A placeholder in the operation's path does not match a
+     * literal in the route's, so `/settings/{id}` is not `/settings/metadata`. The route may have
+     * more leading segments, which a server URL carries, but the operation may not have more
+     * than the route.
+     */
+    private static function endsWith(string $routePath, string $operationPath): bool
+    {
+        $route = explode('/', trim($routePath, '/'));
+        $operation = explode('/', trim($operationPath, '/'));
+
+        if (count($operation) > count($route)) {
+            return false;
+        }
+
+        foreach (array_reverse($operation) as $offset => $segment) {
+            $theirs = $route[count($route) - 1 - $offset];
+            if ($segment !== $theirs && !str_starts_with($theirs, '{')) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

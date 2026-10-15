@@ -9,6 +9,7 @@ use OpenApi\Builder\Mode;
 use OpenApi\Spec as OA;
 use OpenApi\Specification;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
 use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Introspector;
 use Radebatz\OpenApi\Introspector\Status;
@@ -16,6 +17,7 @@ use Radebatz\OpenApi\Introspector\Tests\Fixtures\PrefixedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\RenamedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\RoutedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\SharedParameterController;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\StackedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\UsersController;
 
 /**
@@ -144,6 +146,73 @@ final class FoldTest extends TestCase
 
         $this->assertSame(Status::Introspected, $introspector->inventory()->get('delete', '/orders/{order_id}')?->status);
         $this->assertSame(Status::Introspected, $introspector->inventory()->get('delete', '/orders/{hash}')?->status);
+    }
+
+    public function testOperationsStackedOnOneMethodPairWithTheRoutesTheirPathsName(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('rooms', [StackedController::class, 'rooms']);
+        $router->get('rooms/reservations/{id}', [StackedController::class, 'reservation']);
+
+        [$document, $introspector] = $this->build($router, StackedController::class);
+
+        $this->assertSame('Get a reservation', $document['paths']['/rooms/reservations/{id}']['get']['summary'], 'not replaced by the route');
+        $this->assertSame('The reservation', $document['paths']['/rooms/reservations/{id}']['get']['responses'][200]['description']);
+        $this->assertSame('List rooms', $document['paths']['/rooms']['get']['summary']);
+        $this->assertSame(Status::Matched, $introspector->inventory()->get('get', '/rooms')?->status);
+        $this->assertSame(Status::Matched, $introspector->inventory()->get('get', '/rooms/reservations/{id}')?->status);
+    }
+
+    public function testAPlaceholderInTheAttributesPathDoesNotMatchALiteralRouteSegment(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('settings/metadata', [StackedController::class, 'metadata']);
+        $router->get('settings/{id}', [StackedController::class, 'reservation']);
+
+        [$document, $introspector] = $this->build($router, StackedController::class);
+
+        $this->assertSame('Get a setting', $document['paths']['/settings/{id}']['get']['summary']);
+        $this->assertSame(Status::Matched, $introspector->inventory()->get('get', '/settings/{id}')?->status, "the route its path names, not its handler's");
+        $this->assertSame(Status::Introspected, $introspector->inventory()->get('get', '/settings/metadata')?->status);
+    }
+
+    public function testARouteAtAPathDocumentedForAnotherRouteIsAConflict(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('api/accounts', [StackedController::class, 'accounts']);
+        $router->get('accounts', [UsersController::class, 'index']);
+
+        $logger = new class () extends AbstractLogger {
+            /** @var list<string> */
+            public array $warnings = [];
+
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                if ($level === 'warning') {
+                    $this->warnings[] = (string) $message;
+                }
+            }
+        };
+        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router));
+        $document = $introspector->register($this->builder(StackedController::class)->setLogger($logger))->build()->toArray();
+
+        $this->assertSame('List accounts', $document['paths']['/accounts']['get']['summary'], 'the documented operation stands');
+        $this->assertArrayNotHasKey('/api/accounts', $document['paths']);
+        $this->assertSame(Status::Matched, $introspector->inventory()->get('get', '/api/accounts')?->status, 'by its handler, the attribute path written relative to the server');
+        $this->assertSame(Status::Conflict, $introspector->inventory()->get('get', '/accounts')?->status);
+        $this->assertContains('Route GET /accounts is not added: attributes document GET /accounts for another route', $logger->warnings);
+    }
+
+    public function testAScannedHandlerAtAPathDocumentedForAnotherRouteIsAConflict(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('api/accounts', [StackedController::class, 'accounts']);
+        $router->get('accounts', [StackedController::class, 'reservation']);
+
+        [$document, $introspector] = $this->build($router, StackedController::class);
+
+        $this->assertSame('List accounts', $document['paths']['/accounts']['get']['summary'], "not replaced by the translator's operation");
+        $this->assertSame(Status::Conflict, $introspector->inventory()->get('get', '/accounts')?->status);
     }
 
     public function testAnOperationDeclaredOnAnotherMethodIsCompletedFromTheRoute(): void

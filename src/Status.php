@@ -13,4 +13,6 @@ enum Status: string
     case Introspected = 'introspected';
     /** Attributes describe it and no route serves it. */
     case Unrouted = 'unrouted';
+    /** A route nothing describes, at a path attributes document for another route; it is left out, so the documented operation stands. */
+    case Conflict = 'conflict';
 }

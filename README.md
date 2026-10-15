@@ -239,9 +239,15 @@ The second output. One entry per method and path, with a status:
 | `Matched` | attributes describe it and a route serves it |
 | `Introspected` | a route serves it and nothing else describes it; the adapter's operation went in |
 | `Unrouted` | attributes describe it and no route serves it |
+| `Conflict` | a route nothing describes, at a path attributes document for another route; it is left out |
 
 `Unrouted` is the case worth acting on: a documented endpoint that is not routed is a defect in
 one of the two, and the document alone cannot show it.
+
+`Conflict` usually means attribute paths are written relative to a server URL (`/users` under
+`https://example.com/api`) while the routes carry the prefix, and a web route happens to sit at the
+documented path. The documented operation is kept, and the builder's logger gets a warning naming
+both.
 
 ### Extending
 
