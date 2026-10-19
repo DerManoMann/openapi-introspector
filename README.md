@@ -42,7 +42,7 @@ Supported frameworks:
 ## Requirements
 
 * PHP 8.2 or higher
-* `zircote/swagger-php` 6.13 or higher, for the `PathItem` chain helpers and `ComponentIndex::parameterKey()`
+* `zircote/swagger-php` 6.17 or higher, for the `PathItem` chain helpers, `ComponentIndex::parameterKey()` and the `methods:` split
 
 ## Usage
 
@@ -231,11 +231,11 @@ what the router will match. Attributes win on description. In practice:
 * A handler serving several routes, such as a Laravel route with an optional parameter, folds
   only the route its attribute names by method and path. The others are contributed whole, and
   a bare `#[OA\Response]` on such a handler joins none of them.
-* A route with several methods, such as Laravel's `Route::match(['get', 'post'], ...)`, is one
-  route per method, all served by the same handler. An `#[OA\Operation]` that sets `method`
-  folds into the route for that method. Attributes that name no method, such as a bare
-  `#[OA\Response]` or an `#[OA\Operation]` without `method`, join none of them and are lost.
-  To describe every method, declare one operation per method, each with its own responses.
+* A route with several methods on one path, such as Laravel's
+  `Route::match(['get', 'post'], ...)`, is one route per method, all served by the same handler.
+  Attributes that name no method, such as a bare `#[OA\Response]`, a parameter attribute or an
+  `#[OA\Operation]` without `method`, describe every method. An `#[OA\Operation]` that sets
+  `method` folds into the route for that method only.
 * A route parameter's constraint, such as Laravel's `where('id', '[0-9]+')` or Slim's
   `{id:[0-9]+}`, becomes the parameter's `pattern`. The type is `integer` only where the
   pattern admits nothing else, and `string` otherwise.

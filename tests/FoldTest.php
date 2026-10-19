@@ -14,6 +14,8 @@ use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Introspector;
 use Radebatz\OpenApi\Introspector\Status;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\AttributedController;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\MultiMethodController;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\MultiMethodUserController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\PrefixedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\RenamedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\RoutedController;
@@ -292,6 +294,47 @@ final class FoldTest extends TestCase
         $this->assertArrayHasKey('/items/{page}', $document['paths'], 'the other route is contributed whole');
         $this->assertSame(Status::Matched, $introspector->inventory()->get('get', '/items')?->status);
         $this->assertSame(Status::Introspected, $introspector->inventory()->get('get', '/items/{page}')?->status);
+    }
+
+    public function testARouteForSeveralMethodsGivesEachTheBareAttributes(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->match(['put', 'patch'], 'users/{id}', [MultiMethodUserController::class, 'change'])->where('id', '[0-9]+');
+
+        [$document, $introspector] = $this->build($router, MultiMethodUserController::class);
+
+        foreach (['put', 'patch'] as $method) {
+            $operation = $document['paths']['/users/{id}'][$method];
+            $this->assertSame('Changed', $operation['responses'][204]['description'], $method);
+            $this->assertSame('The user id', $operation['parameters'][0]['description'], "{$method}: the attribute's parameter");
+            $this->assertSame('[0-9]+', $operation['parameters'][0]['schema']['pattern'], "{$method}: folded with the route's");
+            $this->assertSame(Status::Matched, $introspector->inventory()->get($method, '/users/{id}')?->status, $method);
+        }
+    }
+
+    public function testAnOperationWithoutAMethodDescribesEveryMethodOfItsPath(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->match(['post', 'put'], 'drafts', [MultiMethodController::class, 'save']);
+
+        [$document] = $this->build($router, MultiMethodController::class);
+
+        foreach (['post', 'put'] as $method) {
+            $this->assertSame('Save a draft', $document['paths']['/drafts'][$method]['summary'], $method);
+            $this->assertSame('Saved', $document['paths']['/drafts'][$method]['responses'][201]['description'], $method);
+        }
+    }
+
+    public function testAnOperationNamingItsMethodFoldsIntoThatRouteOnly(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->match(['post', 'put'], 'drafts/{id}', [MultiMethodController::class, 'replace']);
+
+        [$document, $introspector] = $this->build($router, MultiMethodController::class);
+
+        $this->assertSame('Replace a draft', $document['paths']['/drafts/{id}']['put']['summary']);
+        $this->assertArrayNotHasKey('summary', $document['paths']['/drafts/{id}']['post'], 'the other method is contributed whole');
+        $this->assertSame(Status::Introspected, $introspector->inventory()->get('post', '/drafts/{id}')?->status);
     }
 
     public function testAControllerPrefixIsNotAppliedTwice(): void

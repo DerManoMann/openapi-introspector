@@ -2,6 +2,7 @@
 
 namespace Radebatz\OpenApi\Introspector;
 
+use OpenApi\Assembler\OperationMethodsTranslator;
 use OpenApi\Builder;
 use OpenApi\Contracts\AttributeInterface;
 use OpenApi\Spec as OA;
@@ -51,7 +52,8 @@ final class Introspector
     public function register(Builder $builder): Builder
     {
         $builder->withAttributeFactory(fn (AttributeFactory $factory): AttributeFactory => $factory->withTranslators(
-            fn (TypedList $translators): TypedList => $translators->add(new RouteTranslator($this)),
+            // before the splitter, so a `methods:` operation it adds is split per method
+            fn (TypedList $translators): TypedList => $translators->insert(new RouteTranslator($this), OperationMethodsTranslator::class),
         ));
 
         $builder->withAugmenters(fn (Pipeline $augmenters): Pipeline => $augmenters->insert(
