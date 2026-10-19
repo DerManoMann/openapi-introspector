@@ -13,8 +13,9 @@ use OpenApi\Spec as OA;
  * An operation the attributes already declare is given the route's path and method where it
  * leaves them out. Routes serving one path with several methods give one operation with
  * `methods:`, which swagger-php's `OperationMethodsTranslator` splits after the attributes
- * have nested, so each method gets them all. Nothing else is filled here: the route's parameters wait until nesting is
- * done, and {@see Introspector::introspect()} folds them in then.
+ * have nested, so each method gets them all. Nothing else is filled here: the route's
+ * parameters wait until nesting is done, and {@see Introspector::introspect()} folds them in
+ * then.
  *
  * An operation it creates carries its class as a `meta` key. Attributes it cannot see, such as
  * classic ones that hybrid mode assembles later, describe the route on an operation without it.
