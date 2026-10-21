@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Radebatz\OpenApi\Introspector\Adapters\SlimAdapter;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\PingController;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\TypedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\UsersController;
 use Slim\App;
 use Slim\Factory\AppFactory;
@@ -116,6 +117,18 @@ final class SlimAdapterTest extends TestCase
         $paths = array_map(static fn (OA\Operation $operation): ?string => $operation->path, $this->operations($app, prefix: 'api'));
 
         $this->assertSame(['/users', '/users/{id}', '/dashboard'], $paths);
+    }
+
+    public function testAScalarSignatureTypeCarriesTheParameterReflector(): void
+    {
+        $app = AppFactory::create();
+        $app->get('/number/{id}', [TypedController::class, 'number']);
+
+        $parameter = ($this->operations($app)[0]->parameters ?? [])[0];
+
+        $this->assertInstanceOf(\ReflectionParameter::class, $parameter->getReflector());
+        $this->assertInstanceOf(OA\Schema::class, $parameter->schema);
+        $this->assertNull($parameter->schema->type);
     }
 
     /**

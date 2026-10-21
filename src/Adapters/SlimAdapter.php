@@ -51,7 +51,7 @@ final readonly class SlimAdapter implements AdapterInterface
                         path: Prefix::strip($this->prefix, $path),
                         method: $method,
                         operationId: $name,
-                        parameters: $this->parameters($parameters),
+                        parameters: $this->parameters($parameters, $reflector),
                     );
                     $operation->setReflector($reflector);
 
@@ -136,11 +136,14 @@ final readonly class SlimAdapter implements AdapterInterface
      *
      * @return list<OA\Parameter>|null
      */
-    private function parameters(array $parameters): ?array
+    private function parameters(array $parameters, ?\ReflectionMethod $handler): ?array
     {
         $result = [];
         foreach ($parameters as $name => $pattern) {
-            $result[] = new OA\Parameter\Path(name: $name, schema: $this->constraint->schema($pattern));
+            $reflector = $this->handler->parameter($handler, $name);
+            $parameter = new OA\Parameter\Path(name: $name, schema: $this->constraint->schema($pattern, $reflector instanceof \ReflectionParameter));
+            $parameter->setReflector($reflector);
+            $result[] = $parameter;
         }
 
         return $result === [] ? null : $result;

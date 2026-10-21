@@ -15,6 +15,7 @@ use Radebatz\OpenApi\Introspector\Introspector;
 use Radebatz\OpenApi\Introspector\Inventory\Entry;
 use Radebatz\OpenApi\Introspector\Status;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\AttributedController;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\TypedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\UsersController;
 
 /**
@@ -123,6 +124,23 @@ final class IntrospectorTest extends TestCase
     {
         $this->expectException(\LogicException::class);
         (new Introspector())->inventory();
+    }
+
+    public function testAPathParameterTakesItsTypeFromTheSignature(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('number/{id}', [TypedController::class, 'number']);
+        $router->get('text/{slug}', [TypedController::class, 'text']);
+        $router->get('digits/{slug}', [TypedController::class, 'text'])->where('slug', '[0-9]+');
+        $router->get('bound/{user}', [TypedController::class, 'bound']);
+
+        $document = (new Introspector())->addAdapter(new LaravelAdapter($router))->register($this->builder())->build()->toArray();
+        $type = static fn (string $path): mixed => $document['paths'][$path]['get']['parameters'][0]['schema']['type'] ?? null;
+
+        $this->assertSame('integer', $type('/number/{id}'));
+        $this->assertSame('string', $type('/text/{slug}'));
+        $this->assertSame('integer', $type('/digits/{slug}'), 'what the route matches wins over the signature');
+        $this->assertSame('string', $type('/bound/{user}'), 'a bound model says nothing about the path value');
     }
 
     private function builder(): Builder

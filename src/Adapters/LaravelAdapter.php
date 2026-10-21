@@ -58,7 +58,7 @@ final readonly class LaravelAdapter implements AdapterInterface
                         path: Prefix::strip($this->prefix, $path),
                         method: $method,
                         operationId: $name,
-                        parameters: $this->parameters($parameters, $route->wheres),
+                        parameters: $this->parameters($parameters, $route->wheres, $reflector),
                     );
                     $operation->setReflector($reflector);
 
@@ -113,11 +113,14 @@ final readonly class LaravelAdapter implements AdapterInterface
      *
      * @return list<OA\Parameter>|null
      */
-    private function parameters(array $names, array $wheres): ?array
+    private function parameters(array $names, array $wheres, ?\ReflectionMethod $handler): ?array
     {
         $parameters = [];
         foreach ($names as $name) {
-            $parameters[] = new OA\Parameter\Path(name: $name, schema: $this->constraint->schema($wheres[$name] ?? null));
+            $reflector = $this->handler->parameter($handler, $name);
+            $parameter = new OA\Parameter\Path(name: $name, schema: $this->constraint->schema($wheres[$name] ?? null, $reflector instanceof \ReflectionParameter));
+            $parameter->setReflector($reflector);
+            $parameters[] = $parameter;
         }
 
         return $parameters === [] ? null : $parameters;
