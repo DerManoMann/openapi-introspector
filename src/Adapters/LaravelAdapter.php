@@ -13,6 +13,7 @@ use Psr\Log\LoggerInterface;
 use Radebatz\OpenApi\Introspector\AdapterInterface;
 use Radebatz\OpenApi\Introspector\Routing\Constraint;
 use Radebatz\OpenApi\Introspector\Routing\Handler;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\Authentication;
 use Radebatz\OpenApi\Introspector\Routing\Laravel\ValidationRules;
 use Radebatz\OpenApi\Introspector\Routing\Prefix;
 
@@ -39,6 +40,7 @@ final readonly class LaravelAdapter implements AdapterInterface
         private string $prefix = '',
         private ValidationRules $rules = new ValidationRules(),
         private ?LoggerInterface $logger = null,
+        private Authentication $authentication = new Authentication(),
     ) {
     }
 
@@ -58,6 +60,7 @@ final readonly class LaravelAdapter implements AdapterInterface
             $reflector = $this->handler->reflectCallable($route->getAction('uses'));
             $name = $this->nameAsOperationId ? $route->getName() : null;
             $input = $this->input($reflector, $route);
+            $guards = $this->authentication->guards($this->middleware($route));
 
             foreach ($this->paths($route) as [$path, $parameters]) {
                 foreach ($this->methods($route) as $method) {
@@ -68,7 +71,8 @@ final readonly class LaravelAdapter implements AdapterInterface
                         operationId: $name,
                         parameters: $this->parameters($parameters, $route->wheres, $reflector, $inBody ? [] : $input ?? []),
                         requestBody: $inBody ? $this->requestBody($input ?? []) : null,
-                        responses: $this->responses($parameters, $reflector, $input !== null),
+                        responses: $this->responses($parameters, $reflector, $input !== null, $guards !== null),
+                        security: $guards !== null ? $this->authentication->requirements($guards) : null,
                     );
                     $operation->setReflector($reflector);
 
@@ -170,9 +174,12 @@ final readonly class LaravelAdapter implements AdapterInterface
      *
      * @return list<OA\Response>|null
      */
-    private function responses(array $names, ?\ReflectionMethod $handler, bool $validates): ?array
+    private function responses(array $names, ?\ReflectionMethod $handler, bool $validates, bool $authenticates): ?array
     {
         $responses = [];
+        if ($authenticates) {
+            $responses[] = new OA\Response(response: 401, description: 'Unauthorized');
+        }
         foreach ($names as $name) {
             if ($this->isBound($handler, $name)) {
                 $responses[] = new OA\Response(response: 404, description: 'Not Found');
@@ -184,6 +191,25 @@ final readonly class LaravelAdapter implements AdapterInterface
         }
 
         return $responses === [] ? null : $responses;
+    }
+
+    /**
+     * The route's middleware and its controller's, less what the route excludes.
+     *
+     * Reading a controller's middleware can build the controller, which needs what the application
+     * provides; where that fails, the route's own middleware is what there is.
+     *
+     * @return list<mixed>
+     */
+    private function middleware(Route $route): array
+    {
+        try {
+            $middleware = $route->gatherMiddleware();
+        } catch (\Throwable) {
+            $middleware = $route->middleware();
+        }
+
+        return array_values(array_diff(array_filter($middleware, is_string(...)), $route->excludedMiddleware()));
     }
 
     /**

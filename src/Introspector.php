@@ -271,14 +271,18 @@ final class Introspector
     /**
      * Folds what the route knows into an assembled operation, where the operation leaves it out.
      *
-     * The operation is the base and wins on every field it sets but one. From the route it takes
-     * the `operationId` and the path parameters, mapped onto its own placeholders by position, so a
-     * route's `{event}` is the attribute's `{id}`: a parameter it lacks is added, and one it has
-     * gets the route's schema where it has none. Where it has one, the route's `pattern` replaces its
-     * own, since that is what the router matches. A parameter its controller's path items declare
-     * is left to them. A response is added for a status code the operation has none for, its own
-     * range included, so a `4XX` stays the answer for a 404. The route's request body goes in only
-     * where the operation has none.
+     * The operation is the base and wins on every field it sets but one, a path parameter's
+     * `pattern`. From the route it takes:
+     *
+     * - the `operationId`, where it has none;
+     * - the parameters, a path parameter mapped onto its own placeholders by position, so a route's
+     *   `{event}` is the attribute's `{id}`. One it lacks is added, and one it has gets the route's
+     *   schema where it has none. Where it has one, the route's `pattern` replaces its own, since
+     *   that is what the router matches. A parameter its controller's path items declare is left
+     *   to them;
+     * - a response for each status code it has none for, its own range included, so a `4XX` stays
+     *   the answer for a 404;
+     * - the request body and the security requirements, each only where it has none.
      */
     private function complete(ComponentIndex $components, OA\Operation $operation, OA\Operation $route, PathItemHierarchy $hierarchy): void
     {
@@ -290,6 +294,8 @@ final class Introspector
 
         $operation->operationId ??= $route->operationId;
         $operation->requestBody ??= $route->requestBody?->copy();
+        // an empty list is an operation the attributes declare public, and stays so
+        $operation->security ??= $route->security !== null ? array_map(static fn (OA\Security\Requirement $requirement): OA\Security\Requirement => $requirement->copy(), $route->security) : null;
         $placeholders = $this->placeholderNames($hierarchy->pathFor($operation) ?? $operation->path ?? (string) $route->path, (string) $route->path);
 
         foreach ($route->parameters ?? [] as $parameter) {
@@ -529,6 +535,9 @@ final class Introspector
                 $copy->responses = array_map(self::copy(...), $copy->responses);
             }
             $copy->requestBody = $copy->requestBody?->copy();
+            if ($copy->security !== null) {
+                $copy->security = array_map(static fn (OA\Security\Requirement $requirement): OA\Security\Requirement => $requirement->copy(), $copy->security);
+            }
         } elseif ($copy instanceof OA\Parameter && $copy->schema instanceof Schema) {
             $copy->schema = self::copy($copy->schema);
         }

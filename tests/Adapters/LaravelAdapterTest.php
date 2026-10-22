@@ -9,10 +9,13 @@ use OpenApi\Spec as OA;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\Authentication;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\AccountController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\FormRequestController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\PingController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\PostsController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\TypedController;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\UnbuildableController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\UsersController;
 
 final class LaravelAdapterTest extends TestCase
@@ -230,6 +233,35 @@ final class LaravelAdapterTest extends TestCase
         $this->assertSame([422], array_map(static fn (OA\Response $response): int|string|null => $response->response, $rename->responses ?? []));
         $this->assertCount(1, $logger->messages);
         $this->assertStringContainsString('UserBoundRequest', $logger->messages[0]);
+    }
+
+    public function testAuthenticationMiddlewareAddsA401AndTheMappedScheme(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('account', [AccountController::class, 'show'])->middleware('auth:sanctum');
+        $router->get('profile', [AccountController::class, 'show'])->middleware('auth:web');
+        $router->get('open', [AccountController::class, 'show'])->middleware('auth:sanctum')->withoutMiddleware('auth:sanctum');
+        $router->get('ping', [PingController::class, '__invoke']);
+
+        [$account, $profile, $open, $ping] = $this->operations(new LaravelAdapter($router, authentication: new Authentication(['sanctum' => 'bearerAuth'])));
+        $codes = static fn (OA\Operation $operation): array => array_map(static fn (OA\Response $response): int|string|null => $response->response, $operation->responses ?? []);
+
+        $this->assertSame([401], $codes($account));
+        $this->assertSame(['bearerAuth'], array_map(static fn (OA\Security\Requirement $requirement): ?string => $requirement->scheme, $account->security ?? []));
+        $this->assertSame([401], $codes($profile));
+        $this->assertNull($profile->security, 'a guard without a scheme gets the 401 alone');
+        $this->assertSame([], $codes($open), 'excluded middleware does not authenticate');
+        $this->assertNull($ping->security);
+    }
+
+    public function testAControllerThatCannotBeBuiltKeepsTheRoutesMiddleware(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('legacy', [UnbuildableController::class, 'show'])->middleware('auth');
+
+        [$legacy] = $this->operations(new LaravelAdapter($router));
+
+        $this->assertSame([401], array_map(static fn (OA\Response $response): int|string|null => $response->response, $legacy->responses ?? []));
     }
 
     /**
