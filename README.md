@@ -341,6 +341,14 @@ what the router will match. Attributes win on description. In practice:
   handler's signature, adds a `404` response, which is what Laravel answers when no row matches.
   A parameter with a default gets none, since the default takes the place of a missing row. A
   `404` or `4XX` the attributes declare wins.
+* A Laravel handler that takes a form request gets its input from the request's `rules()`: a
+  request body for `POST`, `PUT` and `PATCH`, query parameters otherwise, and a `422` response.
+  Only rules with a plain schema equivalent are read: `required`, `nullable`, the type rules
+  (`string`, `integer`, `numeric`, `boolean`, `array`, `date`), `min`, `max`, `between`, `in`,
+  `email`, `url` and `uuid`, with dotted keys such as `items.*.id` nesting. Any other rule leaves
+  the field as it is. `rules()` is called outside a request, so one that needs the user or the
+  route cannot be read; the operation then gets only the `422`, and the adapter's `logger`, if
+  it has one, says why. A request body the attributes declare wins, and so does their `422`.
 * `HEAD` is dropped as an artefact of `GET`, and a Laravel fallback route is not an endpoint.
 * A route name becomes the `operationId` only when the adapter is asked to, with
   `nameAsOperationId: true`, because that is a convention and not a fact.
