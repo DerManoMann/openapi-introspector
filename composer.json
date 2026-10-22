@@ -71,9 +71,6 @@
         "slim/slim": "^4.0"
     },
     "suggest": {
-        "darkaonline/l5-swagger": "Serves the document in a Laravel application; Integrations\\L5Swagger\\BuilderFactory plugs the introspector into its builder_factory option"
-    },
-    "conflict": {
-        "darkaonline/l5-swagger": "<11.2.1"
+        "darkaonline/l5-swagger": "Serves the document in a Laravel application; Integrations\\L5Swagger\\BuilderFactory plugs the introspector into its builder_factory option (11.2.1 or later)"
     }
 }
