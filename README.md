@@ -161,9 +161,71 @@ it is. The inventory then reports the same paths the document has.
 
 ### Generating for L5-Swagger
 
-[L5-Swagger](https://github.com/DarkaOnLine/L5-Swagger) builds its document itself, with no
-hook for a contribution, so for now the integration is an artisan command that writes the file
-L5-Swagger serves:
+[L5-Swagger](https://github.com/DarkaOnLine/L5-Swagger) 11.2.1 and later take a
+`builder_factory`, and this package has one. In `config/l5-swagger.php`, under `defaults`:
+
+```php
+'scanOptions' => [
+    'builder_factory' => \Radebatz\OpenApi\Introspector\Integrations\L5Swagger\BuilderFactory::class,
+    // ...
+],
+```
+
+The factory documents the routes in the `api` middleware group, in hybrid mode, so the
+attributes a project already has are read as they are.
+
+The option takes a class name. Laravel serializes its config for `php artisan config:cache`,
+which an object does not survive, so L5-Swagger creates the factory itself, with no arguments.
+Nothing can be passed in.
+
+Of L5-Swagger's own settings, the builder gets:
+
+* the `annotations` paths, with the `pattern` and `exclude` scan options, as its sources
+* `open_api_spec_version`
+* the base path, as a server
+
+`processors`, `analyser`, `analysis` and `default_processors_configuration` configure
+L5-Swagger's classic generator and do not reach the builder.
+
+Everything else is customised by subclassing, with the subclass's class name in the config:
+
+```php
+use Illuminate\Support\Facades\Route;
+use OpenApi\Builder;
+use Psr\Log\LoggerInterface;
+use Radebatz\OpenApi\Introspector\Integrations\L5Swagger\BuilderFactory;
+
+class ApiDocsFactory extends BuilderFactory
+{
+    protected function routes(): iterable
+    {
+        return array_filter(
+            Route::getRoutes()->getRoutes(),
+            static fn ($route): bool => str_starts_with($route->uri(), 'api/v2/'),
+        );
+    }
+
+    protected function builder(): Builder
+    {
+        return parent::builder()->setLogger(app(LoggerInterface::class));
+    }
+}
+```
+
+```php
+'builder_factory' => \App\OpenApi\ApiDocsFactory::class,
+```
+
+The methods to override:
+
+* `routes()` - the routes to document
+* `mode()` - the build mode
+* `builder()` - the `Builder` before the introspector is registered on it, for anything else
+  it takes, such as a logger or augmenters
+* `introspector()` - the introspector, for another adapter or a `prefix`
+
+Before 11.2.1, L5-Swagger has no hook for a contribution, so the integration is an artisan
+command that writes the file L5-Swagger serves:
 
 ```php
 use Illuminate\Console\Command;
