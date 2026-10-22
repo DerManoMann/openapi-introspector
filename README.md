@@ -337,6 +337,10 @@ what the router will match. Attributes win on description. In practice:
   that is typed `int`, `float`, `string` or `bool`, and is `string` where it is not. A class
   type, such as a model Laravel binds from the route's value, says nothing about the value in
   the path and is not read.
+* A Laravel route parameter bound to a model, such as `{post}` with `Post $post` in the
+  handler's signature, adds a `404` response, which is what Laravel answers when no row matches.
+  A parameter with a default gets none, since the default takes the place of a missing row. A
+  `404` or `4XX` the attributes declare wins.
 * `HEAD` is dropped as an artefact of `GET`, and a Laravel fallback route is not an endpoint.
 * A route name becomes the `operationId` only when the adapter is asked to, with
   `nameAsOperationId: true`, because that is a convention and not a fact.

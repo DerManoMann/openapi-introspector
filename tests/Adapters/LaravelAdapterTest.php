@@ -9,6 +9,7 @@ use OpenApi\Spec as OA;
 use PHPUnit\Framework\TestCase;
 use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\PingController;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\PostsController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\TypedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\UsersController;
 
@@ -157,6 +158,30 @@ final class LaravelAdapterTest extends TestCase
         $this->assertNull($untyped->getReflector());
         $this->assertInstanceOf(OA\Schema::class, $untyped->schema);
         $this->assertSame('string', $untyped->schema->type);
+    }
+
+    public function testAPlaceholderBoundToAModelGetsANotFound(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('posts/{post}', [PostsController::class, 'show']);
+        $router->get('blog/{blog_post}', [PostsController::class, 'snake']);
+        $router->get('maybe/{post}', [PostsController::class, 'defaulted']);
+        $router->get('bound/{user}', [TypedController::class, 'bound']);
+        $router->get('number/{id}', [TypedController::class, 'number']);
+
+        [$model, $snake, $defaulted, $bound, $number] = array_map(
+            static fn (OA\Operation $operation): ?array => $operation->responses,
+            $this->operations(new LaravelAdapter($router)),
+        );
+
+        $this->assertNotNull($model);
+        $this->assertCount(1, $model);
+        $this->assertSame(404, $model[0]->response);
+        $this->assertSame('Not Found', $model[0]->description);
+        $this->assertNotNull($snake, 'a snake case placeholder binds the camel case parameter');
+        $this->assertNull($defaulted, 'a default takes the place of a missing row');
+        $this->assertNull($bound, 'a class that is not routable is not bound');
+        $this->assertNull($number);
     }
 
     /**

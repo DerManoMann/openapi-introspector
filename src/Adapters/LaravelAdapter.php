@@ -2,9 +2,11 @@
 
 namespace Radebatz\OpenApi\Introspector\Adapters;
 
+use Illuminate\Contracts\Routing\UrlRoutable;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\RouteCollectionInterface;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Str;
 use OpenApi\Spec as OA;
 use Radebatz\OpenApi\Introspector\AdapterInterface;
 use Radebatz\OpenApi\Introspector\Routing\Constraint;
@@ -12,11 +14,9 @@ use Radebatz\OpenApi\Introspector\Routing\Handler;
 use Radebatz\OpenApi\Introspector\Routing\Prefix;
 
 /**
- * Reads the routes a Laravel router holds.
- *
- * A route with a controller action carries that method's reflector, so the pipeline reads the
- * docblock and the signature; a closure route is yielded bare. `HEAD` is dropped as an
- * artefact of `GET`, and a fallback route is not an endpoint.
+ * Reads the routes a Laravel router holds. Everything the introspector knows about a Laravel
+ * route comes from here; what a route contributes, and what wins where attributes describe it
+ * too, is in the README.
  *
  * It takes the router, its route collection, or any iterable of routes, so a caller that wants
  * only some of them filters first and hands over what is left. A `prefix` comes off every route
@@ -59,6 +59,7 @@ final readonly class LaravelAdapter implements AdapterInterface
                         method: $method,
                         operationId: $name,
                         parameters: $this->parameters($parameters, $route->wheres, $reflector),
+                        responses: $this->responses($parameters, $reflector),
                     );
                     $operation->setReflector($reflector);
 
@@ -124,5 +125,46 @@ final readonly class LaravelAdapter implements AdapterInterface
         }
 
         return $parameters === [] ? null : $parameters;
+    }
+
+    /**
+     * @param list<string> $names
+     *
+     * @return list<OA\Response>|null
+     */
+    private function responses(array $names, ?\ReflectionMethod $handler): ?array
+    {
+        foreach ($names as $name) {
+            if ($this->isBound($handler, $name)) {
+                return [new OA\Response(response: 404, description: 'Not Found')];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether Laravel binds a placeholder to a model and answers 404 when no row matches.
+     *
+     * Implicit binding, as Laravel does it: the handler's parameter of that name, or of its
+     * camel case form, is typed with a routable class, such as an Eloquent model. A default
+     * takes the place of a missing row, so a parameter with one is never a 404.
+     */
+    private function isBound(?\ReflectionMethod $handler, string $name): bool
+    {
+        foreach ($handler?->getParameters() ?? [] as $parameter) {
+            if ($parameter->getName() !== $name && Str::snake($parameter->getName()) !== $name) {
+                continue;
+            }
+
+            $type = $parameter->getType();
+
+            return $type instanceof \ReflectionNamedType
+                && !$type->isBuiltin()
+                && is_a($type->getName(), UrlRoutable::class, true)
+                && !$parameter->isDefaultValueAvailable();
+        }
+
+        return false;
     }
 }

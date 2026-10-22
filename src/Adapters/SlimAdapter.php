@@ -11,11 +11,9 @@ use Slim\Interfaces\RouteCollectorInterface;
 use Slim\Interfaces\RouteInterface;
 
 /**
- * Reads the routes a Slim route collector holds.
- *
- * Slim keeps the constraint inside the pattern (`/users/{id:[0-9]+}`) and marks optional
- * segments with brackets (`/users[/{id}]`), so both are parsed out here. A class-based
- * callable carries its method's reflector; a closure is yielded bare.
+ * Reads the routes a Slim route collector holds. Everything the introspector knows about a Slim
+ * route comes from here; what a route contributes, and what wins where attributes describe it
+ * too, is in the README.
  *
  * It takes the route collector or any iterable of routes, so a caller that wants only some of
  * them filters first and hands over what is left. A `prefix` comes off every route path that
