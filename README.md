@@ -237,8 +237,11 @@ what the router will match. Attributes win on description. In practice:
   `#[OA\Operation]` without `method`, describe every method. An `#[OA\Operation]` that sets
   `method` folds into the route for that method only.
 * A route parameter's constraint, such as Laravel's `where('id', '[0-9]+')` or Slim's
-  `{id:[0-9]+}`, becomes the parameter's `pattern`. The type is `integer` only where the
-  pattern admits nothing else, and `string` otherwise.
+  `{id:[0-9]+}`, becomes the parameter's `pattern`. The type is `integer` where the pattern
+  admits nothing else. Otherwise it comes from the handler's parameter of the same name, if
+  that is typed `int`, `float`, `string` or `bool`, and is `string` where it is not. A class
+  type, such as a model Laravel binds from the route's value, says nothing about the value in
+  the path and is not read.
 * `HEAD` is dropped as an artefact of `GET`, and a Laravel fallback route is not an endpoint.
 * A route name becomes the `operationId` only when the adapter is asked to, with
   `nameAsOperationId: true`, because that is a convention and not a fact.

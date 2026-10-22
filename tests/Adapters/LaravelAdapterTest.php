@@ -9,6 +9,7 @@ use OpenApi\Spec as OA;
 use PHPUnit\Framework\TestCase;
 use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\PingController;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\TypedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\UsersController;
 
 final class LaravelAdapterTest extends TestCase
@@ -135,6 +136,27 @@ final class LaravelAdapterTest extends TestCase
         );
 
         $this->assertSame(['/users', '/', '/apis', '/dashboard'], $paths, 'whole segments only, and a path without it is left alone');
+    }
+
+    public function testAScalarSignatureTypeCarriesTheParameterReflector(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('number/{id}', [TypedController::class, 'number']);
+        $router->get('bound/{user}', [TypedController::class, 'bound']);
+        $router->get('untyped/{id}', [TypedController::class, 'untyped']);
+
+        [$number, $bound, $untyped] = array_map(
+            static fn (OA\Operation $operation): OA\Parameter => ($operation->parameters ?? [])[0],
+            $this->operations(new LaravelAdapter($router)),
+        );
+
+        $this->assertInstanceOf(\ReflectionParameter::class, $number->getReflector());
+        $this->assertInstanceOf(OA\Schema::class, $number->schema);
+        $this->assertNull($number->schema->type, 'the type is read from the signature');
+        $this->assertNull($bound->getReflector(), 'a class type is route-model binding, not the path value');
+        $this->assertNull($untyped->getReflector());
+        $this->assertInstanceOf(OA\Schema::class, $untyped->schema);
+        $this->assertSame('string', $untyped->schema->type);
     }
 
     /**

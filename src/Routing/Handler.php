@@ -10,10 +10,14 @@ namespace Radebatz\OpenApi\Introspector\Routing;
  * path and the reflected name together, so two invokables never collide. A closure has
  * nothing to reflect on that names it, so it yields `null` and the route is contributed bare.
  *
- * Only the operation carries the reflector. The pipeline reads its docblock for the summary
- * and description and never its signature, so parameters the container injects are invisible
- * by construction, and so is the signature's type for a route parameter. Extend to resolve a project's own handler conventions, such as a
- * container id or a command class.
+ * The operation carries the method reflector, for the docblock's summary and description. A
+ * route parameter carries the signature's parameter of the same name, so the pipeline reads its
+ * type, but only for a scalar. A class type is a binding the framework resolves from the
+ * route's value, such as Laravel's route-model binding, and says nothing about the value in the
+ * path. An enum is left out too, since swagger-php reads nothing from an enum type unless the
+ * enum has a schema of its own, and the parameter would lose the `string` it has without one. Parameters the container injects match no placeholder, so they stay
+ * invisible. Extend to resolve a project's own handler conventions, such as a container id or a
+ * command class.
  */
 class Handler
 {
@@ -49,6 +53,27 @@ class Handler
 
         if (is_object($callable) && !$callable instanceof \Closure) {
             return $this->reflect($callable::class, '__invoke');
+        }
+
+        return null;
+    }
+
+    /**
+     * The handler's parameter for a route placeholder, where its type describes the path value.
+     */
+    public function parameter(?\ReflectionMethod $method, string $name): ?\ReflectionParameter
+    {
+        foreach ($method?->getParameters() ?? [] as $parameter) {
+            if ($parameter->getName() !== $name) {
+                continue;
+            }
+
+            $type = $parameter->getType();
+            if (!$type instanceof \ReflectionNamedType) {
+                return null;
+            }
+
+            return in_array($type->getName(), ['int', 'float', 'string', 'bool'], true) ? $parameter : null;
         }
 
         return null;
