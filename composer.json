@@ -71,6 +71,7 @@
         "slim/slim": "^4.0"
     },
     "suggest": {
-        "darkaonline/l5-swagger": "Serves the document in a Laravel application; Integrations\\L5Swagger\\BuilderFactory plugs the introspector into its builder_factory option (11.2.1 or later)"
+        "darkaonline/l5-swagger": "Serves the document in a Laravel application; Integrations\\L5Swagger\\BuilderFactory plugs the introspector into its builder_factory option (11.2.1 or later)",
+        "radebatz/openapi-verifier": "Verifies responses against the document, in Laravel and Slim tests, as PSR-15 middleware or in Guzzle and PSR-18 clients"
     }
 }
