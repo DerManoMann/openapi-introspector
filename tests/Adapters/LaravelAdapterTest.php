@@ -7,7 +7,9 @@ use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 use OpenApi\Spec as OA;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
 use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\FormRequestController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\PingController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\PostsController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\TypedController;
@@ -182,6 +184,52 @@ final class LaravelAdapterTest extends TestCase
         $this->assertNull($defaulted, 'a default takes the place of a missing row');
         $this->assertNull($bound, 'a class that is not routable is not bound');
         $this->assertNull($number);
+    }
+
+    public function testAFormRequestDescribesTheInputAndA422(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->post('posts', [FormRequestController::class, 'store']);
+        $router->get('posts', [FormRequestController::class, 'search']);
+        $router->get('posts/{post}', [PostsController::class, 'show']);
+
+        [$store, $search, $show] = $this->operations(new LaravelAdapter($router));
+
+        $this->assertInstanceOf(OA\RequestBody::class, $body = $store->requestBody);
+        $this->assertTrue($body->required);
+        $this->assertSame([422], array_map(static fn (OA\Response $response): int|string|null => $response->response, $store->responses ?? []));
+        $this->assertNull($store->parameters, 'a body, no query');
+
+        $this->assertNull($search->requestBody);
+        $query = $search->parameters ?? [];
+        $this->assertSame(['q', 'page'], array_map(static fn (OA\Parameter $parameter): ?string => $parameter->name, $query));
+        $this->assertSame(['query', 'query'], array_map(static fn (OA\Parameter $parameter): ?string => $parameter->in, $query));
+        $this->assertTrue($query[0]->required);
+        $this->assertNull($query[1]->required);
+
+        $this->assertSame([404], array_map(static fn (OA\Response $response): int|string|null => $response->response, $show->responses ?? []), 'no form request, no 422');
+    }
+
+    public function testRulesThatCannotBeReadKeepThe422(): void
+    {
+        $logger = new class () extends AbstractLogger {
+            /** @var list<string> */
+            public array $messages = [];
+
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                $this->messages[] = (string) $message;
+            }
+        };
+        $router = new Router(new Dispatcher());
+        $router->post('users/name', [FormRequestController::class, 'rename']);
+
+        [$rename] = $this->operations(new LaravelAdapter($router, logger: $logger));
+
+        $this->assertNull($rename->requestBody);
+        $this->assertSame([422], array_map(static fn (OA\Response $response): int|string|null => $response->response, $rename->responses ?? []));
+        $this->assertCount(1, $logger->messages);
+        $this->assertStringContainsString('UserBoundRequest', $logger->messages[0]);
     }
 
     /**

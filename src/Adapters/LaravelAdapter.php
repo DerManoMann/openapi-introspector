@@ -3,14 +3,17 @@
 namespace Radebatz\OpenApi\Introspector\Adapters;
 
 use Illuminate\Contracts\Routing\UrlRoutable;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\RouteCollectionInterface;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Str;
 use OpenApi\Spec as OA;
+use Psr\Log\LoggerInterface;
 use Radebatz\OpenApi\Introspector\AdapterInterface;
 use Radebatz\OpenApi\Introspector\Routing\Constraint;
 use Radebatz\OpenApi\Introspector\Routing\Handler;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\ValidationRules;
 use Radebatz\OpenApi\Introspector\Routing\Prefix;
 
 /**
@@ -21,6 +24,7 @@ use Radebatz\OpenApi\Introspector\Routing\Prefix;
  * It takes the router, its route collection, or any iterable of routes, so a caller that wants
  * only some of them filters first and hands over what is left. A `prefix` comes off every route
  * path that starts with it, for a document whose paths are relative to a server URL carrying it.
+ * The logger hears about a form request whose rules cannot be read.
  */
 final readonly class LaravelAdapter implements AdapterInterface
 {
@@ -33,6 +37,8 @@ final readonly class LaravelAdapter implements AdapterInterface
         private Handler $handler = new Handler(),
         private Constraint $constraint = new Constraint(),
         private string $prefix = '',
+        private ValidationRules $rules = new ValidationRules(),
+        private ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -51,15 +57,18 @@ final readonly class LaravelAdapter implements AdapterInterface
 
             $reflector = $this->handler->reflectCallable($route->getAction('uses'));
             $name = $this->nameAsOperationId ? $route->getName() : null;
+            $input = $this->input($reflector, $route);
 
             foreach ($this->paths($route) as [$path, $parameters]) {
                 foreach ($this->methods($route) as $method) {
+                    $inBody = in_array($method, ['post', 'put', 'patch'], true);
                     $operation = new OA\Operation(
                         path: Prefix::strip($this->prefix, $path),
                         method: $method,
                         operationId: $name,
-                        parameters: $this->parameters($parameters, $route->wheres, $reflector),
-                        responses: $this->responses($parameters, $reflector),
+                        parameters: $this->parameters($parameters, $route->wheres, $reflector, $inBody ? [] : $input ?? []),
+                        requestBody: $inBody ? $this->requestBody($input ?? []) : null,
+                        responses: $this->responses($parameters, $reflector, $input !== null),
                     );
                     $operation->setReflector($reflector);
 
@@ -109,12 +118,13 @@ final readonly class LaravelAdapter implements AdapterInterface
     }
 
     /**
-     * @param list<string>          $names
-     * @param array<string, string> $wheres
+     * @param list<string>                          $names
+     * @param array<string, string>                 $wheres
+     * @param array<string, array{OA\Schema, bool}> $query
      *
      * @return list<OA\Parameter>|null
      */
-    private function parameters(array $names, array $wheres, ?\ReflectionMethod $handler): ?array
+    private function parameters(array $names, array $wheres, ?\ReflectionMethod $handler, array $query): ?array
     {
         $parameters = [];
         foreach ($names as $name) {
@@ -124,7 +134,35 @@ final readonly class LaravelAdapter implements AdapterInterface
             $parameters[] = $parameter;
         }
 
+        foreach ($query as $name => [$schema, $required]) {
+            $parameters[] = new OA\Parameter\Query(name: $name, required: $required ?: null, schema: $schema->copy());
+        }
+
         return $parameters === [] ? null : $parameters;
+    }
+
+    /**
+     * @param array<string, array{OA\Schema, bool}> $fields
+     */
+    private function requestBody(array $fields): ?OA\RequestBody
+    {
+        if ($fields === []) {
+            return null;
+        }
+
+        $properties = [];
+        $required = [];
+        foreach ($fields as $name => [$schema, $isRequired]) {
+            $properties[$name] = $schema->copy();
+            if ($isRequired) {
+                $required[] = $name;
+            }
+        }
+
+        return new OA\RequestBody(
+            required: $required !== [] ?: null,
+            content: new OA\Schema(type: 'object', properties: $properties, required: $required ?: null),
+        );
     }
 
     /**
@@ -132,12 +170,64 @@ final readonly class LaravelAdapter implements AdapterInterface
      *
      * @return list<OA\Response>|null
      */
-    private function responses(array $names, ?\ReflectionMethod $handler): ?array
+    private function responses(array $names, ?\ReflectionMethod $handler, bool $validates): ?array
     {
+        $responses = [];
         foreach ($names as $name) {
             if ($this->isBound($handler, $name)) {
-                return [new OA\Response(response: 404, description: 'Not Found')];
+                $responses[] = new OA\Response(response: 404, description: 'Not Found');
+                break;
             }
+        }
+        if ($validates) {
+            $responses[] = new OA\Response(response: 422, description: 'Unprocessable Content');
+        }
+
+        return $responses === [] ? null : $responses;
+    }
+
+    /**
+     * The fields a handler's form request validates, or `null` where it takes none.
+     *
+     * Laravel validates a `FormRequest` in the signature before the handler runs, and answers 422
+     * when it fails. Its `rules()` is called here on a bare instance, outside any request, so one
+     * that reads the user, the route or the input sees none of them. Where that fails, the fields
+     * are left out and the logger says why; the request still validates, so the 422 stays.
+     *
+     * @return array<string, array{OA\Schema, bool}>|null
+     */
+    private function input(?\ReflectionMethod $handler, Route $route): ?array
+    {
+        foreach ($handler?->getParameters() ?? [] as $parameter) {
+            $type = $parameter->getType();
+            if (!$type instanceof \ReflectionNamedType || $type->isBuiltin() || !is_a($class = $type->getName(), FormRequest::class, true)) {
+                continue;
+            }
+
+            if (!method_exists($class, 'rules')) {
+                return [];
+            }
+
+            try {
+                if ((new \ReflectionMethod($class, 'rules'))->getNumberOfRequiredParameters() > 0) {
+                    throw new \RuntimeException('rules() takes arguments');
+                }
+                // a warning, such as reading a property of the user there is none of, fails it too
+                set_error_handler(static function (int $severity, string $message, string $file, int $line): never {
+                    throw new \ErrorException($message, 0, $severity, $file, $line);
+                });
+                try {
+                    $rules = (new $class())->rules();
+                } finally {
+                    restore_error_handler();
+                }
+            } catch (\Throwable $throwable) {
+                $this->logger?->warning(sprintf('Cannot read the rules of %s for %s: %s', $class, $route->uri(), $throwable->getMessage()));
+
+                return [];
+            }
+
+            return is_array($rules) ? $this->rules->fields($rules) : [];
         }
 
         return null;

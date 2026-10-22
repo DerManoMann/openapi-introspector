@@ -14,6 +14,7 @@ use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Introspector;
 use Radebatz\OpenApi\Introspector\Status;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\AttributedController;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\FormRequestController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\MultiMethodController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\MultiMethodUserController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\PostsController;
@@ -380,6 +381,25 @@ final class FoldTest extends TestCase
         $this->assertSame('Not Found', $responses('/described/{post}')[404]['description'], 'added beside what attributes declare');
         $this->assertSame('No such post', $responses('/own/{post}')[404]['description'], "the attribute's own 404 wins");
         $this->assertArrayNotHasKey(404, $responses('/range/{post}'), 'a 4XX the attributes declare covers it');
+    }
+
+    public function testAFormRequestFillsTheBodyTheAttributesLeaveOut(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->post('posts', [FormRequestController::class, 'store']);
+        $router->post('documented', [FormRequestController::class, 'documented']);
+
+        [$document] = $this->build($router, FormRequestController::class);
+
+        $store = $document['paths']['/posts']['post'];
+        $schema = $store['requestBody']['content']['application/json']['schema'] ?? [];
+        $this->assertSame(['title', 'status', 'tags', 'author'], array_keys($schema['properties'] ?? []));
+        $this->assertSame(['title', 'status'], $schema['required'] ?? null);
+        $this->assertSame('Unprocessable Content', $store['responses'][422]['description']);
+
+        $documented = $document['paths']['/documented']['post'];
+        $this->assertSame(['body'], array_keys($documented['requestBody']['content']['application/json']['schema']['properties'] ?? []), "the attribute's body wins");
+        $this->assertSame('Invalid post', $documented['responses'][422]['description']);
     }
 
     /**

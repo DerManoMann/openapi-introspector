@@ -277,7 +277,8 @@ final class Introspector
      * gets the route's schema where it has none. Where it has one, the route's `pattern` replaces its
      * own, since that is what the router matches. A parameter its controller's path items declare
      * is left to them. A response is added for a status code the operation has none for, its own
-     * range included, so a `4XX` stays the answer for a 404.
+     * range included, so a `4XX` stays the answer for a 404. The route's request body goes in only
+     * where the operation has none.
      */
     private function complete(ComponentIndex $components, OA\Operation $operation, OA\Operation $route, PathItemHierarchy $hierarchy): void
     {
@@ -288,6 +289,7 @@ final class Introspector
         }
 
         $operation->operationId ??= $route->operationId;
+        $operation->requestBody ??= $route->requestBody?->copy();
         $placeholders = $this->placeholderNames($hierarchy->pathFor($operation) ?? $operation->path ?? (string) $route->path, (string) $route->path);
 
         foreach ($route->parameters ?? [] as $parameter) {
@@ -526,6 +528,7 @@ final class Introspector
             if ($copy->responses !== null) {
                 $copy->responses = array_map(self::copy(...), $copy->responses);
             }
+            $copy->requestBody = $copy->requestBody?->copy();
         } elseif ($copy instanceof OA\Parameter && $copy->schema instanceof Schema) {
             $copy->schema = self::copy($copy->schema);
         }
