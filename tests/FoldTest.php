@@ -12,7 +12,9 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Introspector;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\Authentication;
 use Radebatz\OpenApi\Introspector\Status;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\AccountController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\AttributedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\FormRequestController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\MultiMethodController;
@@ -400,6 +402,22 @@ final class FoldTest extends TestCase
         $documented = $document['paths']['/documented']['post'];
         $this->assertSame(['body'], array_keys($documented['requestBody']['content']['application/json']['schema']['properties'] ?? []), "the attribute's body wins");
         $this->assertSame('Invalid post', $documented['responses'][422]['description']);
+    }
+
+    public function testAuthenticationFillsWhatTheAttributesLeaveOut(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('account', [AccountController::class, 'show'])->middleware('auth:sanctum');
+        $router->get('public', [AccountController::class, 'public'])->middleware('auth:sanctum');
+        $router->get('described', [AccountController::class, 'described'])->middleware('auth:sanctum');
+
+        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router, authentication: new Authentication(['sanctum' => 'bearerAuth'])));
+        $document = $introspector->register($this->builder(AccountController::class))->build()->toArray();
+
+        $this->assertSame([['bearerAuth' => []]], $document['paths']['/account']['get']['security'] ?? null);
+        $this->assertSame('Unauthorized', $document['paths']['/account']['get']['responses'][401]['description']);
+        $this->assertSame([], $document['paths']['/public']['get']['security'] ?? null, 'an operation the attributes declare public stays so');
+        $this->assertSame('Log in first', $document['paths']['/described']['get']['responses'][401]['description'], "the attribute's own 401 wins");
     }
 
     /**

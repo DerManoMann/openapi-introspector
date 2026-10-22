@@ -349,6 +349,23 @@ what the router will match. Attributes win on description. In practice:
   the field as it is. `rules()` is called outside a request, so one that needs the user or the
   route cannot be read; the operation then gets only the `422`, and the adapter's `logger`, if
   it has one, says why. A request body the attributes declare wins, and so does their `422`.
+* A Laravel route behind authentication middleware, `auth` or `auth:<guard>` or the
+  `Authenticate` class, gets a `401` response. Which security scheme a guard stands for is the
+  application's to say, so `security` is only added where the adapter's `authentication` maps
+  every guard on the route to a scheme the document declares:
+
+  ```php
+  use Radebatz\OpenApi\Introspector\Routing\Laravel\Authentication;
+
+  new LaravelAdapter($router, authentication: new Authentication(
+      schemes: ['sanctum' => 'bearerAuth'],
+      default: 'sanctum', // the guard a bare `auth` uses, `web` unless given
+  ));
+  ```
+
+  `names` lists the middleware that authenticates, `['auth']` by default, for a project with
+  middleware of its own. The attributes' `security`
+  wins, including an empty one for a public operation, and so does their `401`.
 * `HEAD` is dropped as an artefact of `GET`, and a Laravel fallback route is not an endpoint.
 * A route name becomes the `operationId` only when the adapter is asked to, with
   `nameAsOperationId: true`, because that is a convention and not a fact.

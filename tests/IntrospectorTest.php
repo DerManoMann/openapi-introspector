@@ -13,7 +13,9 @@ use Radebatz\OpenApi\Introspector\AdapterInterface;
 use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Introspector;
 use Radebatz\OpenApi\Introspector\Inventory\Entry;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\Authentication;
 use Radebatz\OpenApi\Introspector\Status;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\AccountController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\AttributedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\PostsController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\TypedController;
@@ -154,6 +156,19 @@ final class IntrospectorTest extends TestCase
         $second = $introspector->register($this->builder())->build()->toArray();
 
         $this->assertSame('Not Found', $first['paths']['/posts/{post}']['get']['responses'][404]['description'] ?? null);
+        $this->assertSame($first, $second, 'the route kept for the next build is unchanged');
+    }
+
+    public function testAContributedRouteKeepsItsSecurity(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('account', [AccountController::class, 'show'])->middleware('auth:sanctum');
+
+        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router, authentication: new Authentication(['sanctum' => 'bearerAuth'])));
+        $first = $introspector->register($this->builder())->build()->toArray();
+        $second = $introspector->register($this->builder())->build()->toArray();
+
+        $this->assertSame([['bearerAuth' => []]], $first['paths']['/account']['get']['security'] ?? null);
         $this->assertSame($first, $second, 'the route kept for the next build is unchanged');
     }
 
