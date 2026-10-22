@@ -16,6 +16,7 @@ use Radebatz\OpenApi\Introspector\Status;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\AttributedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\MultiMethodController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\MultiMethodUserController;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\PostsController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\PrefixedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\RenamedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\RoutedController;
@@ -361,6 +362,24 @@ final class FoldTest extends TestCase
         $second = $introspector->register($this->builder(PrefixedController::class))->build()->toArray();
 
         $this->assertSame($first, $second);
+    }
+
+    public function testABoundModelAddsANotFoundTheAttributesLeaveOut(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('posts/{post}', [PostsController::class, 'show']);
+        $router->get('described/{post}', [PostsController::class, 'described']);
+        $router->get('own/{post}', [PostsController::class, 'own']);
+        $router->get('range/{post}', [PostsController::class, 'range']);
+
+        [$document] = $this->build($router, PostsController::class);
+        $responses = static fn (string $path): array => $document['paths'][$path]['get']['responses'] ?? [];
+
+        $this->assertSame(['404' => ['description' => 'Not Found']], $responses('/posts/{post}'), 'a route nothing describes');
+        $this->assertSame('The post', $responses('/described/{post}')[200]['description']);
+        $this->assertSame('Not Found', $responses('/described/{post}')[404]['description'], 'added beside what attributes declare');
+        $this->assertSame('No such post', $responses('/own/{post}')[404]['description'], "the attribute's own 404 wins");
+        $this->assertArrayNotHasKey(404, $responses('/range/{post}'), 'a 4XX the attributes declare covers it');
     }
 
     /**

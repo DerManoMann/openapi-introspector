@@ -276,7 +276,8 @@ final class Introspector
      * route's `{event}` is the attribute's `{id}`: a parameter it lacks is added, and one it has
      * gets the route's schema where it has none. Where it has one, the route's `pattern` replaces its
      * own, since that is what the router matches. A parameter its controller's path items declare
-     * is left to them.
+     * is left to them. A response is added for a status code the operation has none for, its own
+     * range included, so a `4XX` stays the answer for a 404.
      */
     private function complete(ComponentIndex $components, OA\Operation $operation, OA\Operation $route, PathItemHierarchy $hierarchy): void
     {
@@ -324,6 +325,19 @@ final class Introspector
                     $existing->schema->pattern = $parameter->schema->pattern;
                 }
             }
+        }
+
+        foreach ($route->responses ?? [] as $response) {
+            $code = (string) $response->response;
+            $range = substr($code, 0, 1) . 'XX';
+            foreach ($operation->responses ?? [] as $existing) {
+                if (in_array(strtoupper((string) $existing->response), [$code, $range], true)) {
+                    continue 2;
+                }
+            }
+
+            $operation->responses ??= [];
+            $operation->responses[] = self::copy($response);
         }
     }
 
@@ -494,19 +508,24 @@ final class Introspector
     /**
      * A copy of what a route holds, so a build changes the copy and not the route kept for the next.
      *
-     * @template T of OA\Operation|OA\Parameter|OA\Schema
+     * @template T of OA\Operation|OA\Parameter|OA\Response|OA\Schema
      *
      * @param T $attribute
      *
      * @return T
      */
-    private static function copy(OA\Operation|OA\Parameter|Schema $attribute): OA\Operation|OA\Parameter|Schema
+    private static function copy(OA\Operation|OA\Parameter|OA\Response|Schema $attribute): OA\Operation|OA\Parameter|OA\Response|Schema
     {
         // `clone` is shallow, and the children are what later augmenters change
         $copy = clone $attribute;
 
-        if ($copy instanceof OA\Operation && $copy->parameters !== null) {
-            $copy->parameters = array_map(self::copy(...), $copy->parameters);
+        if ($copy instanceof OA\Operation) {
+            if ($copy->parameters !== null) {
+                $copy->parameters = array_map(self::copy(...), $copy->parameters);
+            }
+            if ($copy->responses !== null) {
+                $copy->responses = array_map(self::copy(...), $copy->responses);
+            }
         } elseif ($copy instanceof OA\Parameter && $copy->schema instanceof Schema) {
             $copy->schema = self::copy($copy->schema);
         }

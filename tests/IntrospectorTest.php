@@ -15,6 +15,7 @@ use Radebatz\OpenApi\Introspector\Introspector;
 use Radebatz\OpenApi\Introspector\Inventory\Entry;
 use Radebatz\OpenApi\Introspector\Status;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\AttributedController;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\PostsController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\TypedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\UsersController;
 
@@ -141,6 +142,19 @@ final class IntrospectorTest extends TestCase
         $this->assertSame('string', $type('/text/{slug}'));
         $this->assertSame('integer', $type('/digits/{slug}'), 'what the route matches wins over the signature');
         $this->assertSame('string', $type('/bound/{user}'), 'a bound model says nothing about the path value');
+    }
+
+    public function testAContributedRouteKeepsItsNotFound(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('posts/{post}', [PostsController::class, 'show']);
+
+        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router));
+        $first = $introspector->register($this->builder())->build()->toArray();
+        $second = $introspector->register($this->builder())->build()->toArray();
+
+        $this->assertSame('Not Found', $first['paths']['/posts/{post}']['get']['responses'][404]['description'] ?? null);
+        $this->assertSame($first, $second, 'the route kept for the next build is unchanged');
     }
 
     private function builder(): Builder
