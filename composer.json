@@ -61,6 +61,7 @@
         "zircote/swagger-php": "^6.17"
     },
     "require-dev": {
+        "darkaonline/l5-swagger": "^11.2.1",
         "friendsofphp/php-cs-fixer": "^3.62.0",
         "laravel/framework": "^12.0 || ^13.0",
         "nyholm/psr7": "^1.8",
@@ -68,5 +69,11 @@
         "phpunit/phpunit": "^11.5",
         "rector/rector": "^2.0",
         "slim/slim": "^4.0"
+    },
+    "suggest": {
+        "darkaonline/l5-swagger": "Serves the document in a Laravel application; Integrations\\L5Swagger\\BuilderFactory plugs the introspector into its builder_factory option"
+    },
+    "conflict": {
+        "darkaonline/l5-swagger": "<11.2.1"
     }
 }

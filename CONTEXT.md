@@ -26,6 +26,12 @@ The per-framework reader that turns routes into operations, behind `AdapterInter
 implementation per framework.
 _Avoid_: contributor, driver, integration
 
+**Integration**:
+A ready-made class that plugs the introspector into another package's extension point, under
+`Integrations\`, such as `Integrations\L5Swagger\BuilderFactory` for L5-Swagger's
+`builder_factory`. It configures adapters, it does not read routes itself.
+_Avoid_: bridge, plugin
+
 **Handler**:
 The callable a route dispatches to. `Routing\Handler` resolves it to the method reflector the
 pipeline reads, and a path parameter to the method's parameter of the same name where its type
