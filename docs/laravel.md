@@ -17,7 +17,9 @@ A route parameter bound to a model, such as `{post}` with `Post $post` in the ha
 signature, adds a `404` response. That is what Laravel answers when no row matches. The parameter
 matches by name, or by its snake case form, as Laravel's implicit binding does.
 
-A parameter with a default gets none, since the default takes the place of a missing row.
+A default does not change that. Laravel skips binding only where an optional placeholder is
+absent from the URL, and the adapter contributes that path without the placeholder, so it gets
+no `404`. The path with the placeholder still does.
 
 ## Form requests
 
