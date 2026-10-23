@@ -255,19 +255,30 @@ final class LaravelAdapterTest extends TestCase
         $this->assertNull($ping->security);
     }
 
-    public function testAuthorizationMiddlewareAddsA403(): void
+    public function testMiddlewareAddsTheStatusesItAnswersWith(): void
     {
         $router = new Router(new Dispatcher());
-        $router->get('account', [AccountController::class, 'show'])->middleware(['auth', 'can:view,account']);
-        $router->get('reports', [AccountController::class, 'show'])->middleware('ability:reports');
+        $router->get('account', [AccountController::class, 'show'])->middleware(['auth', 'can:view,account', 'throttle:60,1']);
+        $router->get('reports', [AccountController::class, 'show'])->middleware(['ability:reports', 'password.confirm']);
         $router->get('open', [AccountController::class, 'show'])->middleware('can:view')->withoutMiddleware('can:view');
 
         [$account, $reports, $open] = $this->operations(new LaravelAdapter($router));
         $codes = static fn (OA\Operation $operation): array => array_map(static fn (OA\Response $response): int|string|null => $response->response, $operation->responses ?? []);
 
-        $this->assertSame([401, 403], $codes($account));
-        $this->assertSame([403], $codes($reports));
-        $this->assertSame([], $codes($open), 'excluded middleware does not authorize');
+        $this->assertSame([401, 403, 429], $codes($account));
+        $this->assertSame(['Unauthorized', 'Forbidden', 'Too Many Requests'], array_map(static fn (OA\Response $response): ?string => $response->description, $account->responses ?? []));
+        $this->assertSame([403, 423], $codes($reports));
+        $this->assertSame([], $codes($open), 'excluded middleware answers nothing');
+    }
+
+    public function testPassportScopesReachTheSecurity(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('orders', [AccountController::class, 'show'])->middleware(['auth:api', 'scope:orders:read,orders:admin']);
+
+        [$orders] = $this->operations(new LaravelAdapter($router, authentication: new Authentication(['api' => 'passport'])));
+
+        $this->assertSame([['orders:read'], ['orders:admin']], array_map(static fn (OA\Security\Requirement $requirement): ?array => $requirement->scopes, $orders->security ?? []));
     }
 
     public function testAControllerThatCannotBeBuiltKeepsTheRoutesMiddleware(): void

@@ -37,4 +37,16 @@ final class AuthenticationTest extends TestCase
         $this->assertNull($authentication->requirements(['sanctum', 'web']), 'naming only some would say the others are not accepted');
         $this->assertNull((new Authentication())->requirements(['web']), 'no map, no scheme');
     }
+
+    public function testPassportScopesGoOnTheRequirements(): void
+    {
+        $authentication = new Authentication(schemes: ['api' => 'oauth2']);
+        $scopes = static fn (?array $requirements): ?array => $requirements === null ? null : array_map(static fn (OA\Security\Requirement $requirement): ?array => $requirement->scopes, $requirements);
+
+        $this->assertSame([['read', 'write']], $scopes($authentication->requirements(['api'], ['scopes:read,write'])), 'scopes needs all of them');
+        $this->assertSame([['read'], ['write']], $scopes($authentication->requirements(['api'], ['scope:read,write'])), 'scope needs any one');
+        $this->assertSame([['admin', 'read'], ['admin', 'write']], $scopes($authentication->requirements(['api'], ['scopes:admin', 'scope:read,write'])));
+        $this->assertSame([['read']], $scopes($authentication->requirements(['api'], ['Laravel\Passport\Http\Middleware\CheckToken:read'])), 'by class too');
+        $this->assertSame([null], $scopes($authentication->requirements(['api'], ['throttle:60,1'])));
+    }
 }
