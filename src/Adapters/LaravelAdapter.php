@@ -14,6 +14,7 @@ use Radebatz\OpenApi\Introspector\AdapterInterface;
 use Radebatz\OpenApi\Introspector\Routing\Constraint;
 use Radebatz\OpenApi\Introspector\Routing\Handler;
 use Radebatz\OpenApi\Introspector\Routing\Laravel\Authentication;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\Authorization;
 use Radebatz\OpenApi\Introspector\Routing\Laravel\ValidationRules;
 use Radebatz\OpenApi\Introspector\Routing\Prefix;
 
@@ -41,6 +42,7 @@ final readonly class LaravelAdapter implements AdapterInterface
         private ValidationRules $rules = new ValidationRules(),
         private ?LoggerInterface $logger = null,
         private Authentication $authentication = new Authentication(),
+        private Authorization $authorization = new Authorization(),
     ) {
     }
 
@@ -60,7 +62,9 @@ final readonly class LaravelAdapter implements AdapterInterface
             $reflector = $this->handler->reflectCallable($route->getAction('uses'));
             $name = $this->nameAsOperationId ? $route->getName() : null;
             $input = $this->input($reflector, $route);
-            $guards = $this->authentication->guards($this->middleware($route));
+            $middleware = $this->middleware($route);
+            $guards = $this->authentication->guards($middleware);
+            $authorizes = $this->authorization->authorizes($middleware);
 
             foreach ($this->paths($route) as [$path, $parameters]) {
                 foreach ($this->methods($route) as $method) {
@@ -71,7 +75,7 @@ final readonly class LaravelAdapter implements AdapterInterface
                         operationId: $name,
                         parameters: $this->parameters($parameters, $route->wheres, $reflector, $inBody ? [] : $input ?? []),
                         requestBody: $inBody ? $this->requestBody($input ?? []) : null,
-                        responses: $this->responses($parameters, $reflector, $input !== null, $guards !== null),
+                        responses: $this->responses($parameters, $reflector, $input !== null, $guards !== null, $authorizes),
                         security: $guards !== null ? $this->authentication->requirements($guards) : null,
                     );
                     $operation->setReflector($reflector);
@@ -174,11 +178,14 @@ final readonly class LaravelAdapter implements AdapterInterface
      *
      * @return list<OA\Response>|null
      */
-    private function responses(array $names, ?\ReflectionMethod $handler, bool $validates, bool $authenticates): ?array
+    private function responses(array $names, ?\ReflectionMethod $handler, bool $validates, bool $authenticates, bool $authorizes): ?array
     {
         $responses = [];
         if ($authenticates) {
             $responses[] = new OA\Response(response: 401, description: 'Unauthorized');
+        }
+        if ($authorizes) {
+            $responses[] = new OA\Response(response: 403, description: 'Forbidden');
         }
         foreach ($names as $name) {
             if ($this->isBound($handler, $name)) {

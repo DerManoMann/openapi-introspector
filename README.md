@@ -89,7 +89,7 @@ or both describe it.
 * [Routes](docs/routes.md) - where the routes come from, choosing them, and paths relative to a
   server
 * [Adapters](docs/adapters.md) - what a route contributes, and the adapters' options
-* [Laravel](docs/laravel.md) - model binding, form requests and authentication
+* [Laravel](docs/laravel.md) - model binding, form requests, authentication and authorization
 * [What wins](docs/fold.md) - how routes and attributes fold together
 * [The inventory](docs/inventory.md) - which endpoints are documented, routed, or both
 * [Generating for L5-Swagger](docs/l5-swagger.md)
