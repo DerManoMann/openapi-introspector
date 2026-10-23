@@ -191,7 +191,6 @@ Everything else is customised by subclassing, with the subclass's class name in 
 
 ```php
 use Illuminate\Support\Facades\Route;
-use OpenApi\Builder;
 use Psr\Log\LoggerInterface;
 use Radebatz\OpenApi\Introspector\Integrations\L5Swagger\BuilderFactory;
 
@@ -205,9 +204,14 @@ class ApiDocsFactory extends BuilderFactory
         );
     }
 
-    protected function builder(): Builder
+    protected function schemes(): array
     {
-        return parent::builder()->setLogger(app(LoggerInterface::class));
+        return ['sanctum' => 'bearerAuth'];
+    }
+
+    protected function logger(): ?LoggerInterface
+    {
+        return app(LoggerInterface::class);
     }
 }
 ```
@@ -220,9 +224,14 @@ The methods to override:
 
 * `routes()` - the routes to document
 * `mode()` - the build mode
+* `schemes()` - the security scheme each authentication guard stands for, none by default
+* `logger()` - where the builder and the adapter report, nowhere by default
 * `builder()` - the `Builder` before the introspector is registered on it, for anything else
-  it takes, such as a logger or augmenters
+  it takes, such as augmenters
 * `introspector()` - the introspector, for another adapter or a `prefix`
+
+A bare `auth` middleware uses the application's `auth.defaults.guard`, so only the schemes need
+naming.
 
 Before 11.2.1, L5-Swagger has no hook for a contribution, so the integration is an artisan
 command that writes the file L5-Swagger serves:

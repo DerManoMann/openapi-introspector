@@ -2,6 +2,7 @@
 
 namespace Radebatz\OpenApi\Introspector\Tests\Integrations\L5Swagger;
 
+use Illuminate\Config\Repository;
 use Illuminate\Container\Container;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Routing\Router;
@@ -10,8 +11,12 @@ use OpenApi\Builder\Mode;
 use OpenApi\Spec as OA;
 use OpenApi\Specification;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LoggerInterface;
 use Radebatz\OpenApi\Introspector\Integrations\L5Swagger\BuilderFactory;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\AccountController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\ClassicController;
+use Radebatz\OpenApi\Introspector\Tests\Fixtures\FormRequestController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\UsersController;
 
 /**
@@ -99,6 +104,53 @@ final class BuilderFactoryTest extends TestCase
         $this->assertSame('https://api.example.com', $this->build($factory)['servers'][0]['url']);
     }
 
+    public function testABareAuthUsesTheApplicationsDefaultGuard(): void
+    {
+        Container::getInstance()->instance('config', new Repository(['auth' => ['defaults' => ['guard' => 'sanctum']]]));
+        $this->router->middleware(['api', 'auth'])->get('account', [AccountController::class, 'show']);
+
+        $document = $this->build($this->mapping(['sanctum' => 'bearerAuth', 'web' => 'cookieAuth']));
+
+        $this->assertSame([['bearerAuth' => []]], $document['paths']['/account']['get']['security']);
+    }
+
+    public function testABareAuthUsesWebWithoutAConfiguredDefault(): void
+    {
+        $this->router->middleware(['api', 'auth'])->get('account', [AccountController::class, 'show']);
+
+        $document = $this->build($this->mapping(['sanctum' => 'bearerAuth', 'web' => 'cookieAuth']));
+
+        $this->assertSame([['cookieAuth' => []]], $document['paths']['/account']['get']['security']);
+    }
+
+    public function testASubclassGivesTheLogger(): void
+    {
+        $logger = new class () extends AbstractLogger {
+            /** @var list<string> */
+            public array $messages = [];
+
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                $this->messages[] = (string) $message;
+            }
+        };
+        $this->router->middleware('api')->post('users/name', [FormRequestController::class, 'rename']);
+
+        $factory = new class ($logger) extends BuilderFactory {
+            public function __construct(private readonly LoggerInterface $logger)
+            {
+            }
+
+            protected function logger(): LoggerInterface
+            {
+                return $this->logger;
+            }
+        };
+        $this->build($factory);
+
+        $this->assertStringContainsString('UserBoundRequest', implode("\n", $logger->messages), 'the adapter reports to it');
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -109,5 +161,25 @@ final class BuilderFactoryTest extends TestCase
         });
 
         return ($source !== null ? $builder->addSource($source) : $builder)->build()->toArray();
+    }
+
+    /**
+     * @param array<string, string> $schemes
+     */
+    private function mapping(array $schemes): BuilderFactory
+    {
+        return new class ($schemes) extends BuilderFactory {
+            /**
+             * @param array<string, string> $schemes
+             */
+            public function __construct(private readonly array $schemes)
+            {
+            }
+
+            protected function schemes(): array
+            {
+                return $this->schemes;
+            }
+        };
     }
 }
