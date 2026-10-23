@@ -270,8 +270,9 @@ final readonly class LaravelAdapter implements AdapterInterface
      * Whether Laravel binds a placeholder to a model and answers 404 when no row matches.
      *
      * Implicit binding, as Laravel does it: the handler's parameter of that name, or of its
-     * camel case form, is typed with a routable class, such as an Eloquent model. A default
-     * takes the place of a missing row, so a parameter with one is never a 404.
+     * camel case form, is typed with a routable class, such as an Eloquent model. A default does
+     * not change that: Laravel only skips binding where an optional placeholder is absent, and
+     * then the placeholder is not on the path asked about.
      */
     private function isBound(?\ReflectionMethod $handler, string $name): bool
     {
@@ -284,8 +285,7 @@ final readonly class LaravelAdapter implements AdapterInterface
 
             return $type instanceof \ReflectionNamedType
                 && !$type->isBuiltin()
-                && is_a($type->getName(), UrlRoutable::class, true)
-                && !$parameter->isDefaultValueAvailable();
+                && is_a($type->getName(), UrlRoutable::class, true);
         }
 
         return false;
