@@ -2,7 +2,7 @@
 
 Besides what [any route contributes](adapters.md#what-a-route-contributes), the Laravel adapter
 reads what Laravel itself does with a route before the handler runs: binding a model, validating
-a form request, authenticating. Each adds the response Laravel answers with when that step fails.
+a form request, authenticating, authorizing. Each adds the response Laravel answers with when that step fails.
 A response the attributes declare for the same status code wins, as does a range such as `4XX`.
 
 ## Routes
@@ -75,3 +75,29 @@ The attributes' `security` wins, including an empty one for a public operation, 
 
 The [L5-Swagger factory](l5-swagger.md) sets `default` from the application's
 `auth.defaults.guard`.
+
+## Authorization
+
+A route behind authorization middleware gets a `403` response. The middleware is read the same
+way as for [authentication](#authentication). Authorization middleware is:
+
+* the `can` alias, with its ability and models, such as `can:update,post`
+* the `Authorize` class, or a subclass, as `Authorize::using()` names it
+* Sanctum's token ability middleware, by the `abilities` and `ability` aliases or by class
+
+Whether the gate denies depends on the user, and often on the row. The `403` says the route can
+answer with one, not when.
+
+The adapter's `authorization` option lists the middleware that authorizes, for a project with
+middleware of its own. The list replaces the default names. The `Authorize` class always counts:
+
+```php
+use Radebatz\OpenApi\Introspector\Routing\Laravel\Authorization;
+
+new LaravelAdapter($router, authorization: new Authorization(names: ['can', 'role']));
+```
+
+A form request's `authorize()` adds no `403`. Telling a real check from a plain `return true`
+would mean calling it, and outside a request there is no user to call it for.
+
+A `403` the attributes declare wins.

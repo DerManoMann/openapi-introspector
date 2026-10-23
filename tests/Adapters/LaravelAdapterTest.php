@@ -254,6 +254,21 @@ final class LaravelAdapterTest extends TestCase
         $this->assertNull($ping->security);
     }
 
+    public function testAuthorizationMiddlewareAddsA403(): void
+    {
+        $router = new Router(new Dispatcher());
+        $router->get('account', [AccountController::class, 'show'])->middleware(['auth', 'can:view,account']);
+        $router->get('reports', [AccountController::class, 'show'])->middleware('ability:reports');
+        $router->get('open', [AccountController::class, 'show'])->middleware('can:view')->withoutMiddleware('can:view');
+
+        [$account, $reports, $open] = $this->operations(new LaravelAdapter($router));
+        $codes = static fn (OA\Operation $operation): array => array_map(static fn (OA\Response $response): int|string|null => $response->response, $operation->responses ?? []);
+
+        $this->assertSame([401, 403], $codes($account));
+        $this->assertSame([403], $codes($reports));
+        $this->assertSame([], $codes($open), 'excluded middleware does not authorize');
+    }
+
     public function testAControllerThatCannotBeBuiltKeepsTheRoutesMiddleware(): void
     {
         $router = new Router(new Dispatcher());
