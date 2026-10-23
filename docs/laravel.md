@@ -2,7 +2,8 @@
 
 Besides what [any route contributes](adapters.md#what-a-route-contributes), the Laravel adapter
 reads what Laravel itself does with a route before the handler runs: binding a model, validating
-a form request, authenticating, authorizing. Each adds the response Laravel answers with when that step fails.
+a form request, and the route's middleware. Each adds the response Laravel answers with when that
+step fails.
 A response the attributes declare for the same status code wins, as does a range such as `4XX`.
 
 ## Routes
@@ -73,31 +74,52 @@ accepted. A route with a guard that does not map still gets the `401`.
 The attributes' `security` wins, including an empty one for a public operation, and so does their
 `401`.
 
+Passport's scope middleware adds scopes to the requirements:
+
+* `scopes:read,write` needs all of them, so each requirement gets both
+* `scope:read,write` needs any one, so each scope gets a requirement of its own
+
 The [L5-Swagger factory](l5-swagger.md) sets `default` from the application's
 `auth.defaults.guard`.
 
-## Authorization
+## Other middleware
 
-A route behind authorization middleware gets a `403` response. The middleware is read the same
-way as for [authentication](#authentication). Authorization middleware is:
+The route's other middleware, read the same way as for [authentication](#authentication), adds
+the status codes it can answer with:
 
-* the `can` alias, with its ability and models, such as `can:update,post`
-* the `Authorize` class, or a subclass, as `Authorize::using()` names it
-* Sanctum's token ability middleware, by the `abilities` and `ability` aliases or by class
+| Middleware | Response |
+| --- | --- |
+| `can`, such as `can:update,post`, and the `Authorize` class | `403` |
+| `verified` | `403` |
+| `signed` | `403` |
+| `password.confirm` | `423` |
+| `throttle` | `429` |
+| Sanctum's `abilities` and `ability` | `403` |
+| Passport's `scopes` and `scope` | `403` |
+| spatie/laravel-permission's `role`, `permission` and `role_or_permission` | `403` |
 
-Whether the gate denies depends on the user, and often on the row. The `403` says the route can
-answer with one, not when.
+Laravel's own middleware counts by its alias and by its class, a subclass included. Sanctum's,
+Passport's and spatie's count by their aliases and by their class names, without the packages
+being installed. `verified` redirects a request that does not expect JSON. The table gives the
+API's answer.
 
-The adapter's `authorization` option lists the middleware that authorizes, for a project with
-middleware of its own. The list replaces the default names. The `Authorize` class always counts:
+Whether a gate denies, or a limit is reached, depends on the request. The status says the route
+can answer with one, not when.
+
+The adapter's `middleware` option holds the map. A project with middleware of its own extends
+the defaults, since a map given replaces them:
 
 ```php
-use Radebatz\OpenApi\Introspector\Routing\Laravel\Authorization;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\Middleware;
+use Symfony\Component\HttpFoundation\Response;
 
-new LaravelAdapter($router, authorization: new Authorization(names: ['can', 'role']));
+new LaravelAdapter($router, middleware: new Middleware([
+    ...Middleware::DEFAULTS,
+    'tenant' => Response::HTTP_NOT_FOUND,
+]));
 ```
 
 A form request's `authorize()` adds no `403`. Telling a real check from a plain `return true`
 would mean calling it, and outside a request there is no user to call it for.
 
-A `403` the attributes declare wins.
+A response the attributes declare for the same status code wins.

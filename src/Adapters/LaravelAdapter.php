@@ -14,9 +14,10 @@ use Radebatz\OpenApi\Introspector\AdapterInterface;
 use Radebatz\OpenApi\Introspector\Routing\Constraint;
 use Radebatz\OpenApi\Introspector\Routing\Handler;
 use Radebatz\OpenApi\Introspector\Routing\Laravel\Authentication;
-use Radebatz\OpenApi\Introspector\Routing\Laravel\Authorization;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\Middleware;
 use Radebatz\OpenApi\Introspector\Routing\Laravel\ValidationRules;
 use Radebatz\OpenApi\Introspector\Routing\Prefix;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Reads the routes a Laravel router holds. Everything the introspector knows about a Laravel
@@ -42,7 +43,7 @@ final readonly class LaravelAdapter implements AdapterInterface
         private ValidationRules $rules = new ValidationRules(),
         private ?LoggerInterface $logger = null,
         private Authentication $authentication = new Authentication(),
-        private Authorization $authorization = new Authorization(),
+        private Middleware $middleware = new Middleware(),
     ) {
     }
 
@@ -62,9 +63,9 @@ final readonly class LaravelAdapter implements AdapterInterface
             $reflector = $this->handler->reflectCallable($route->getAction('uses'));
             $name = $this->nameAsOperationId ? $route->getName() : null;
             $input = $this->input($reflector, $route);
-            $middleware = $this->middleware($route);
+            $middleware = $this->routeMiddleware($route);
             $guards = $this->authentication->guards($middleware);
-            $authorizes = $this->authorization->authorizes($middleware);
+            $statuses = $this->middleware->statuses($middleware);
 
             foreach ($this->paths($route) as [$path, $parameters]) {
                 foreach ($this->methods($route) as $method) {
@@ -75,8 +76,8 @@ final readonly class LaravelAdapter implements AdapterInterface
                         operationId: $name,
                         parameters: $this->parameters($parameters, $route->wheres, $reflector, $inBody ? [] : $input ?? []),
                         requestBody: $inBody ? $this->requestBody($input ?? []) : null,
-                        responses: $this->responses($parameters, $reflector, $input !== null, $guards !== null, $authorizes),
-                        security: $guards !== null ? $this->authentication->requirements($guards) : null,
+                        responses: $this->responses($parameters, $reflector, $input !== null, $guards !== null, $statuses),
+                        security: $guards !== null ? $this->authentication->requirements($guards, $middleware) : null,
                     );
                     $operation->setReflector($reflector);
 
@@ -175,29 +176,30 @@ final readonly class LaravelAdapter implements AdapterInterface
 
     /**
      * @param list<string> $names
+     * @param list<int>    $statuses what the route's middleware can answer with
      *
      * @return list<OA\Response>|null
      */
-    private function responses(array $names, ?\ReflectionMethod $handler, bool $validates, bool $authenticates, bool $authorizes): ?array
+    private function responses(array $names, ?\ReflectionMethod $handler, bool $validates, bool $authenticates, array $statuses): ?array
     {
-        $responses = [];
+        $codes = $statuses;
         if ($authenticates) {
-            $responses[] = new OA\Response(response: 401, description: 'Unauthorized');
-        }
-        if ($authorizes) {
-            $responses[] = new OA\Response(response: 403, description: 'Forbidden');
+            $codes[] = Response::HTTP_UNAUTHORIZED;
         }
         foreach ($names as $name) {
             if ($this->isBound($handler, $name)) {
-                $responses[] = new OA\Response(response: 404, description: 'Not Found');
+                $codes[] = Response::HTTP_NOT_FOUND;
                 break;
             }
         }
         if ($validates) {
-            $responses[] = new OA\Response(response: 422, description: 'Unprocessable Content');
+            $codes[] = Response::HTTP_UNPROCESSABLE_ENTITY;
         }
 
-        return $responses === [] ? null : $responses;
+        $codes = array_unique($codes);
+        sort($codes);
+
+        return array_map(static fn (int $code): OA\Response => new OA\Response(response: $code, description: Response::$statusTexts[$code] ?? 'Error'), $codes) ?: null;
     }
 
     /**
@@ -208,7 +210,7 @@ final readonly class LaravelAdapter implements AdapterInterface
      *
      * @return list<mixed>
      */
-    private function middleware(Route $route): array
+    private function routeMiddleware(Route $route): array
     {
         try {
             $middleware = $route->gatherMiddleware();

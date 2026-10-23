@@ -27,10 +27,10 @@ best passed by name.
 | `rules` | `new ValidationRules()` | Laravel | [Form requests](laravel.md#form-requests) |
 | `logger` | `null` | Laravel | [Form requests](laravel.md#form-requests) |
 | `authentication` | `new Authentication()` | Laravel | [Authentication](laravel.md#authentication) |
-| `authorization` | `new Authorization()` | Laravel | [Authorization](laravel.md#authorization) |
+| `middleware` | `new Middleware()` | Laravel | [Other middleware](laravel.md#other-middleware) |
 
 `Handler` and `Constraint` are in `Radebatz\OpenApi\Introspector\Routing`, `ValidationRules`,
-`Authentication` and `Authorization` in `Radebatz\OpenApi\Introspector\Routing\Laravel`.
+`Authentication` and `Middleware` in `Radebatz\OpenApi\Introspector\Routing\Laravel`.
 
 ## What a route contributes
 
