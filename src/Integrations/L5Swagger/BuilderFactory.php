@@ -8,8 +8,10 @@ use Illuminate\Routing\Router;
 use L5Swagger\CustomBuilderInterface;
 use OpenApi\Builder;
 use OpenApi\Builder\Mode;
+use Psr\Log\LoggerInterface;
 use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Introspector;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\Authentication;
 
 /**
  * An L5-Swagger `builder_factory` that adds the application's routes to the document.
@@ -28,11 +30,14 @@ class BuilderFactory implements CustomBuilderInterface
 
     /**
      * The builder before the introspector is registered on it, for anything else a project
-     * configures, such as a logger or more augmenters.
+     * configures, such as more augmenters.
      */
     protected function builder(): Builder
     {
-        return (new Builder())->setMode($this->mode());
+        $builder = (new Builder())->setMode($this->mode());
+        $logger = $this->logger();
+
+        return $logger instanceof LoggerInterface ? $builder->setLogger($logger) : $builder;
     }
 
     /**
@@ -43,9 +48,32 @@ class BuilderFactory implements CustomBuilderInterface
         return Mode::HYBRID;
     }
 
+    /**
+     * The logger the builder and the adapter report to, none by default.
+     */
+    protected function logger(): ?LoggerInterface
+    {
+        return null;
+    }
+
     protected function introspector(): Introspector
     {
-        return (new Introspector())->addAdapter(new LaravelAdapter($this->routes()));
+        return (new Introspector())->addAdapter(new LaravelAdapter(
+            $this->routes(),
+            logger: $this->logger(),
+            authentication: new Authentication($this->schemes(), $this->defaultGuard()),
+        ));
+    }
+
+    /**
+     * The security scheme each guard stands for, such as `['sanctum' => 'bearerAuth']`, none by
+     * default. A route whose guards all map gets their security requirements.
+     *
+     * @return array<string, string>
+     */
+    protected function schemes(): array
+    {
+        return [];
     }
 
     /**
@@ -60,5 +88,16 @@ class BuilderFactory implements CustomBuilderInterface
             Container::getInstance()->make(Router::class)->getRoutes()->getRoutes(),
             static fn (Route $route): bool => in_array('api', $route->middleware(), true),
         );
+    }
+
+    /**
+     * The guard a bare `auth` uses: the application's `auth.defaults.guard`, `web` where it sets none.
+     */
+    private function defaultGuard(): string
+    {
+        $container = Container::getInstance();
+        $guard = $container->bound('config') ? $container->make('config')->get('auth.defaults.guard') : null;
+
+        return is_string($guard) && $guard !== '' ? $guard : 'web';
     }
 }
