@@ -10,9 +10,10 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Str;
 use OpenApi\Spec as OA;
 use Psr\Log\LoggerInterface;
-use Radebatz\OpenApi\Introspector\AdapterInterface;
+use Radebatz\OpenApi\Introspector\ConfigurableAdapterInterface;
 use Radebatz\OpenApi\Introspector\Routing\Constraint;
 use Radebatz\OpenApi\Introspector\Routing\Handler;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\Application;
 use Radebatz\OpenApi\Introspector\Routing\Laravel\Authentication;
 use Radebatz\OpenApi\Introspector\Routing\Laravel\Middleware;
 use Radebatz\OpenApi\Introspector\Routing\Laravel\ValidationRules;
@@ -28,8 +29,11 @@ use Symfony\Component\HttpFoundation\Response;
  * only some of them filters first and hands over what is left. A `prefix` comes off every route
  * path that starts with it, for a document whose paths are relative to a server URL carrying it.
  * The logger hears about a form request whose rules cannot be read.
+ *
+ * {@see fromConfig()} creates it from plain settings, reading the routes from the application's
+ * container, for configuration that names it by class.
  */
-final readonly class LaravelAdapter implements AdapterInterface
+final readonly class LaravelAdapter implements ConfigurableAdapterInterface
 {
     /**
      * @param Router|RouteCollectionInterface|iterable<Route> $routes
@@ -45,6 +49,85 @@ final readonly class LaravelAdapter implements AdapterInterface
         private Authentication $authentication = new Authentication(),
         private Middleware $middleware = new Middleware(),
     ) {
+    }
+
+    /**
+     * The routes in a middleware group of the running application.
+     *
+     * Settings, all optional:
+     *
+     * - `middleware`: the group whose routes are documented, `api` by default
+     * - `schemes`: the security scheme each guard stands for, such as `['sanctum' => 'bearerAuth']`, none by default
+     * - `defaultGuard`: the guard a bare `auth` uses, the application's `auth.defaults.guard` by default
+     * - `nameAsOperationId`: a bool, `false` by default
+     * - `application`: an {@see Application} subclass to read the routes and the default guard from, created with no arguments
+     */
+    public static function fromConfig(array $config, ?LoggerInterface $logger = null): static
+    {
+        $middleware = 'api';
+        $schemes = [];
+        $defaultGuard = null;
+        $nameAsOperationId = false;
+        $application = new Application();
+
+        foreach ($config as $name => $value) {
+            switch ($name) {
+                case 'middleware':
+                    if (!is_string($value) || $value === '') {
+                        throw self::invalid($name, $value, 'a middleware group name');
+                    }
+                    $middleware = $value;
+                    break;
+                case 'schemes':
+                    if (!is_array($value) || array_filter($value, is_string(...)) !== $value || array_filter(array_keys($value), is_string(...)) !== array_keys($value)) {
+                        throw self::invalid($name, $value, 'guard names mapped to security scheme names');
+                    }
+                    $schemes = $value;
+                    break;
+                case 'defaultGuard':
+                    if (!is_string($value) || $value === '') {
+                        throw self::invalid($name, $value, 'a guard name');
+                    }
+                    $defaultGuard = $value;
+                    break;
+                case 'nameAsOperationId':
+                    if (!is_bool($value)) {
+                        throw self::invalid($name, $value, 'a bool');
+                    }
+                    $nameAsOperationId = $value;
+                    break;
+                case 'application':
+                    if (!is_string($value) || !is_a($value, Application::class, true)) {
+                        throw self::invalid($name, $value, 'the name of ' . Application::class . ' or a subclass');
+                    }
+                    $application = new $value();
+                    break;
+                default:
+                    throw new \InvalidArgumentException(sprintf(
+                        'Unknown setting "%s" for %s. Expected one of "middleware", "schemes", "defaultGuard", "nameAsOperationId", "application".',
+                        $name,
+                        self::class,
+                    ));
+            }
+        }
+
+        return new self(
+            $application->routes($middleware),
+            nameAsOperationId: $nameAsOperationId,
+            logger: $logger,
+            authentication: new Authentication($schemes, $defaultGuard ?? $application->defaultGuard()),
+        );
+    }
+
+    private static function invalid(string $name, mixed $value, string $expected): \InvalidArgumentException
+    {
+        return new \InvalidArgumentException(sprintf(
+            'Invalid value %s for the "%s" setting of %s. Expected %s.',
+            is_string($value) ? '"' . $value . '"' : get_debug_type($value),
+            $name,
+            self::class,
+            $expected,
+        ));
     }
 
     public function operations(): iterable

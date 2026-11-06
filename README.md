@@ -84,12 +84,38 @@ The adapter reads the framework's routes, and the introspector folds them into t
 builder assembles. `inventory()` then says, for each method and path, whether attributes, a route
 or both describe it.
 
+### As a swagger-php plugin
+
+With swagger-php 7.3 or later, `IntrospectorPlugin` adds the same as `register()`, as a plugin.
+It takes the adapters ready made:
+
+```php
+use Radebatz\OpenApi\Introspector\IntrospectorPlugin;
+
+$builder->withPlugins([new IntrospectorPlugin(new LaravelAdapter($router))]);
+```
+
+Named by its class, the plugin's settings name each adapter that creates itself, keyed by the
+adapter's class with its own settings, so the setup fits in configuration. An empty array takes
+the adapter's defaults. `LaravelAdapter` reads the routes from the running
+application, those in the `api` middleware group by default:
+
+```php
+$builder->withPlugins([
+    IntrospectorPlugin::class => [LaravelAdapter::class => ['schemes' => ['sanctum' => 'bearerAuth']]],
+]);
+```
+
+[Laravel](docs/laravel.md#from-settings) lists its settings. The plugin keeps the introspector to
+itself, so a build that needs the inventory uses `register()`. Plugins are not used in classic mode.
+
 ## Documentation
 
 * [Routes](docs/routes.md) - where the routes come from, choosing them, and paths relative to a
   server
 * [Adapters](docs/adapters.md) - what a route contributes, and the adapters' options
-* [Laravel](docs/laravel.md) - model binding, form requests, authentication and other middleware
+* [Laravel](docs/laravel.md) - model binding, form requests, authentication, other middleware,
+  and the adapter from settings
 * [What wins](docs/fold.md) - how routes and attributes fold together
 * [The inventory](docs/inventory.md) - which endpoints are documented, routed, or both
 * [Generating for L5-Swagger](docs/l5-swagger.md)

@@ -125,3 +125,47 @@ A form request's `authorize()` adds no `403`. Telling a real check from a plain 
 would mean calling it, and outside a request there is no user to call it for.
 
 A response the attributes declare for the same status code wins.
+
+## From settings
+
+`LaravelAdapter::fromConfig()` creates the adapter from plain settings, reading the routes from the
+application's container. That is what [`IntrospectorPlugin`](../README.md#as-a-swagger-php-plugin)
+uses when its settings name `LaravelAdapter`. The settings, all optional:
+
+* `middleware` - the middleware group whose routes are documented, `api` by default
+* `schemes` - the security scheme each guard stands for, such as `['sanctum' => 'bearerAuth']`,
+  none by default
+* `defaultGuard` - the guard a bare `auth` uses, the application's `auth.defaults.guard` by
+  default, `web` where it sets none
+* `nameAsOperationId` - use route names as operation ids, `false` by default
+* `application` - where the routes and the default guard come from, the class name of
+  `Routing\Laravel\Application` or a subclass, created with no arguments
+
+A setting it does not know, or a value it cannot use, throws.
+
+The settings hold only class names and plain values, so the configuration survives
+`php artisan config:cache`. A subclass of `Application` changes which routes are read, such as
+only those of one API version:
+
+```php
+use Illuminate\Routing\Route;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\Application;
+
+class V2Routes extends Application
+{
+    public function routes(string $middleware): array
+    {
+        return array_values(array_filter(
+            parent::routes($middleware),
+            static fn (Route $route): bool => str_starts_with($route->uri(), 'api/v2/'),
+        ));
+    }
+}
+```
+
+```php
+IntrospectorPlugin::class => [LaravelAdapter::class => ['application' => V2Routes::class]],
+```
+
+Anything beyond these, such as a `prefix` or middleware of a project's own, needs the adapter
+created in code.

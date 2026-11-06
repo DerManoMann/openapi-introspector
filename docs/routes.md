@@ -6,7 +6,8 @@ Hand the adapter the route table once the application has registered its routes.
 
 **Laravel**: `app(Router::class)`, or `Route::getRoutes()` through the facade, after the
 application has booted. An artisan command qualifies. A cached route table works the same,
-because `CompiledRouteCollection` rebuilds `Route` objects when asked for them.
+because `CompiledRouteCollection` rebuilds `Route` objects when asked for them. Created
+[from settings](laravel.md#from-settings), the adapter reads them from the application itself.
 
 **Slim**: `$app->getRouteCollector()`, after the code that defines the routes has run and
 before `$app->run()`.

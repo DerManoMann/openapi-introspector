@@ -2,15 +2,14 @@
 
 namespace Radebatz\OpenApi\Introspector\Integrations\L5Swagger;
 
-use Illuminate\Container\Container;
 use Illuminate\Routing\Route;
-use Illuminate\Routing\Router;
 use L5Swagger\CustomBuilderInterface;
 use OpenApi\Builder;
 use OpenApi\Builder\Mode;
 use Psr\Log\LoggerInterface;
 use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Introspector;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\Application;
 use Radebatz\OpenApi\Introspector\Routing\Laravel\Authentication;
 
 /**
@@ -34,8 +33,15 @@ class BuilderFactory implements CustomBuilderInterface
      */
     protected function builder(): Builder
     {
-        $builder = (new Builder())->setMode($this->mode());
         $logger = $this->logger();
+
+        // swagger-php 7.3 takes the logger in the constructor, and deprecates `setLogger()`
+        // @phpstan-ignore function.alreadyNarrowedType
+        if (method_exists(Builder::class, 'withPlugins')) {
+            return (new Builder($logger))->setMode($this->mode());
+        }
+
+        $builder = (new Builder())->setMode($this->mode());
 
         return $logger instanceof LoggerInterface ? $builder->setLogger($logger) : $builder;
     }
@@ -61,7 +67,7 @@ class BuilderFactory implements CustomBuilderInterface
         return (new Introspector())->addAdapter(new LaravelAdapter(
             $this->routes(),
             logger: $this->logger(),
-            authentication: new Authentication($this->schemes(), $this->defaultGuard()),
+            authentication: new Authentication($this->schemes(), (new Application())->defaultGuard()),
         ));
     }
 
@@ -84,20 +90,6 @@ class BuilderFactory implements CustomBuilderInterface
      */
     protected function routes(): iterable
     {
-        return array_filter(
-            Container::getInstance()->make(Router::class)->getRoutes()->getRoutes(),
-            static fn (Route $route): bool => in_array('api', $route->middleware(), true),
-        );
-    }
-
-    /**
-     * The guard a bare `auth` uses: the application's `auth.defaults.guard`, `web` where it sets none.
-     */
-    private function defaultGuard(): string
-    {
-        $container = Container::getInstance();
-        $guard = $container->bound('config') ? $container->make('config')->get('auth.defaults.guard') : null;
-
-        return is_string($guard) && $guard !== '' ? $guard : 'web';
+        return (new Application())->routes('api');
     }
 }

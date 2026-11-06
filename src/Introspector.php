@@ -4,6 +4,7 @@ namespace Radebatz\OpenApi\Introspector;
 
 use OpenApi\Assembler\OperationMethodsTranslator;
 use OpenApi\Builder;
+use OpenApi\Builder\Hooks;
 use OpenApi\Contracts\AttributeInterface;
 use OpenApi\Spec as OA;
 use OpenApi\Spec\Schema;
@@ -48,8 +49,16 @@ final class Introspector
     /**
      * Registers the adapters on the builder: a translator for assembly, and the introspection as
      * the first augmenter.
+     *
+     * It takes swagger-php's plugin hooks too, which {@see IntrospectorPlugin} passes.
+     *
+     * @template T of Builder|Hooks
+     *
+     * @param T $builder
+     *
+     * @return T
      */
-    public function register(Builder $builder): Builder
+    public function register(Builder|Hooks $builder): Builder|Hooks
     {
         $builder->withAttributeFactory(fn (AttributeFactory $factory): AttributeFactory => $factory->withTranslators(
             // before the splitter, so a `methods:` operation it adds is split per method
