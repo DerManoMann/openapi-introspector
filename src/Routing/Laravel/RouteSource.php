@@ -13,10 +13,10 @@ use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
  *
  * Code that is created from its class name, and so cannot be handed the router, reads them from
  * here. A subclass changes what is read, such as only the routes of one API version, and the
- * `application` setting of {@see LaravelAdapter::fromConfig()} names it. It is created with no
+ * `routeSource` setting of {@see LaravelAdapter::fromConfig()} names it. It is created with no
  * arguments there.
  */
-class Application
+class RouteSource
 {
     /**
      * @param Container|null $container the application's container, the global instance by default
@@ -26,16 +26,18 @@ class Application
     }
 
     /**
-     * The routes in a middleware group, which for `api` leaves out the application's web pages and
-     * most routes packages add.
+     * The routes in any of the middleware groups. For `api` that leaves out the application's web
+     * pages and most routes packages add.
+     *
+     * @param list<string> $middleware
      *
      * @return list<Route>
      */
-    public function routes(string $middleware): array
+    public function routes(array $middleware): array
     {
         return array_values(array_filter(
             $this->container()->make(Router::class)->getRoutes()->getRoutes(),
-            static fn (Route $route): bool => in_array($middleware, $route->middleware(), true),
+            static fn (Route $route): bool => array_intersect($middleware, $route->middleware()) !== [],
         ));
     }
 

@@ -41,7 +41,7 @@ _Avoid_: using it for an integration
 **Settings**:
 The plain values a plugin is configured with, which configuration can hold, such as Laravel's
 under `config:cache`. An adapter behind `ConfigurableAdapterInterface` creates itself from them,
-and `Routing\Laravel\Application` is where a Laravel adapter created that way reads the running
+and `Routing\Laravel\RouteSource` is where a Laravel adapter created that way reads the running
 application.
 _Avoid_: options (the adapter's constructor arguments)
 

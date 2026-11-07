@@ -19,7 +19,7 @@ use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Adapters\SlimAdapter;
 use Radebatz\OpenApi\Introspector\Introspector;
 use Radebatz\OpenApi\Introspector\IntrospectorPlugin;
-use Radebatz\OpenApi\Introspector\Routing\Laravel\Application;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\RouteSource;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\AccountController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\FormRequestController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\UsersController;
@@ -95,10 +95,33 @@ final class IntrospectorPluginTest extends TestCase
         $this->assertSame([['bearerAuth' => []]], $document['paths']['/account']['get']['security']);
     }
 
-    public function testTheApplicationSettingNamesWhereTheRoutesComeFrom(): void
+    public function testTheRoutesAndTheDefaultGuardAreReadWhenTheDocumentIsBuilt(): void
     {
-        $application = new class () extends Application {
-            public function routes(string $middleware): array
+        $builder = $this->builder()->withPlugins([IntrospectorPlugin::class => [LaravelAdapter::class => ['schemes' => ['sanctum' => 'bearerAuth']]]]);
+
+        Container::getInstance()->instance('config', new Repository(['auth' => ['defaults' => ['guard' => 'sanctum']]]));
+        $this->router->middleware(['api', 'auth'])->get('account', [AccountController::class, 'show']);
+
+        $document = $builder->build()->toArray();
+
+        $this->assertSame([['bearerAuth' => []]], $document['paths']['/account']['get']['security']);
+    }
+
+    public function testTheMiddlewareSettingTakesAListOfGroups(): void
+    {
+        $this->router->middleware('api')->get('users', [UsersController::class, 'index']);
+        $this->router->middleware('admin')->get('admin/users', [UsersController::class, 'index']);
+        $this->router->middleware('web')->get('home', [UsersController::class, 'index']);
+
+        $document = $this->build([LaravelAdapter::class => ['middleware' => ['api', 'admin']]]);
+
+        $this->assertSame(['/users', '/admin/users'], array_keys($document['paths']));
+    }
+
+    public function testTheRouteSourceSettingNamesWhereTheRoutesComeFrom(): void
+    {
+        $source = new class () extends RouteSource {
+            public function routes(array $middleware): array
             {
                 return array_values(array_filter(
                     parent::routes($middleware),
@@ -109,7 +132,7 @@ final class IntrospectorPluginTest extends TestCase
         $this->router->middleware('api')->get('v1/users', [UsersController::class, 'index']);
         $this->router->middleware('api')->get('v2/users', [UsersController::class, 'index']);
 
-        $document = $this->build([LaravelAdapter::class => ['application' => $application::class]]);
+        $document = $this->build([LaravelAdapter::class => ['routeSource' => $source::class]]);
 
         $this->assertSame(['/v2/users'], array_keys($document['paths']));
     }
@@ -148,10 +171,12 @@ final class IntrospectorPluginTest extends TestCase
         yield 'a setting in place of an adapter' => [['middleware' => 'api'], 'Invalid adapter "middleware"'];
         yield 'settings that are not an array' => [[LaravelAdapter::class => 'api'], 'Invalid settings string for the adapter "' . LaravelAdapter::class . '"'];
         yield 'an unknown adapter setting' => [[LaravelAdapter::class => ['group' => 'api']], 'Unknown setting "group"'];
-        yield 'middleware' => [[LaravelAdapter::class => ['middleware' => ['api']]], 'Invalid value array for the "middleware" setting'];
+        yield 'middleware' => [[LaravelAdapter::class => ['middleware' => ['api', '']]], 'Invalid value array for the "middleware" setting'];
+        yield 'no middleware' => [[LaravelAdapter::class => ['middleware' => []]], 'Invalid value array for the "middleware" setting'];
         yield 'schemes' => [[LaravelAdapter::class => ['schemes' => ['bearerAuth']]], 'Invalid value array for the "schemes" setting'];
         yield 'defaultGuard' => [[LaravelAdapter::class => ['defaultGuard' => '']], 'Invalid value "" for the "defaultGuard" setting'];
-        yield 'application' => [[LaravelAdapter::class => ['application' => Router::class]], 'Invalid value "' . Router::class . '" for the "application" setting'];
+        yield 'routeSource' => [[LaravelAdapter::class => ['routeSource' => Router::class]], 'Invalid value "' . Router::class . '" for the "routeSource" setting'];
+        yield 'a routeSource needing arguments' => [[LaravelAdapter::class => ['routeSource' => Fixtures\ContainerRouteSource::class]], 'Invalid value "' . Fixtures\ContainerRouteSource::class . '" for the "routeSource" setting'];
         yield 'nameAsOperationId' => [[LaravelAdapter::class => ['nameAsOperationId' => 'yes']], 'Invalid value "yes" for the "nameAsOperationId" setting'];
     }
 

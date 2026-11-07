@@ -9,8 +9,8 @@ use OpenApi\Builder\Mode;
 use Psr\Log\LoggerInterface;
 use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Introspector;
-use Radebatz\OpenApi\Introspector\Routing\Laravel\Application;
 use Radebatz\OpenApi\Introspector\Routing\Laravel\Authentication;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\RouteSource;
 
 /**
  * An L5-Swagger `builder_factory` that adds the application's routes to the document.
@@ -67,7 +67,7 @@ class BuilderFactory implements CustomBuilderInterface
         return (new Introspector())->addAdapter(new LaravelAdapter(
             $this->routes(),
             logger: $this->logger(),
-            authentication: new Authentication($this->schemes(), (new Application())->defaultGuard()),
+            authentication: new Authentication($this->schemes(), (new RouteSource())->defaultGuard()),
         ));
     }
 
@@ -90,6 +90,6 @@ class BuilderFactory implements CustomBuilderInterface
      */
     protected function routes(): iterable
     {
-        return (new Application())->routes('api');
+        return (new RouteSource())->routes(['api']);
     }
 }

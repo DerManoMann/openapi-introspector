@@ -95,10 +95,11 @@ use Radebatz\OpenApi\Introspector\IntrospectorPlugin;
 $builder->withPlugins([new IntrospectorPlugin(new LaravelAdapter($router))]);
 ```
 
-Named by its class, the plugin's settings name each adapter that creates itself, keyed by the
-adapter's class with its own settings, so the setup fits in configuration. An empty array takes
-the adapter's defaults. `LaravelAdapter` reads the routes from the running
-application, those in the `api` middleware group by default:
+Named by its class, the plugin takes settings instead: each key is an adapter class, and its value
+that adapter's settings, `[]` for its defaults. Only class names and plain values, so a host that
+passes plugin settings on from its configuration can carry the whole setup. `LaravelAdapter` reads
+the routes from the running application when the document is built, those in the `api` middleware
+group by default:
 
 ```php
 $builder->withPlugins([
@@ -106,8 +107,11 @@ $builder->withPlugins([
 ]);
 ```
 
-[Laravel](docs/laravel.md#from-settings) lists its settings. The plugin keeps the introspector to
-itself, so a build that needs the inventory uses `register()`. Plugins are not used in classic mode.
+[Laravel](docs/laravel.md#from-settings) lists its settings. L5-Swagger has no option for plugins,
+so there it takes a [`builder_factory`](docs/l5-swagger.md#with-the-plugin) of the project's own.
+
+The plugin keeps the introspector to itself, so a build that needs the inventory uses
+`register()`. Plugins are not used in classic mode.
 
 ## Documentation
 
