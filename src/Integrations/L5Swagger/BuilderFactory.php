@@ -11,6 +11,7 @@ use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Introspector;
 use Radebatz\OpenApi\Introspector\Routing\Laravel\Authentication;
 use Radebatz\OpenApi\Introspector\Routing\Laravel\RouteSource;
+use Radebatz\OpenApi\Introspector\Routing\LazyRoutes;
 
 /**
  * An L5-Swagger `builder_factory` that adds the application's routes to the document.
@@ -67,7 +68,7 @@ class BuilderFactory implements CustomBuilderInterface
         return (new Introspector())->addAdapter(new LaravelAdapter(
             $this->routes(),
             logger: $this->logger(),
-            authentication: new Authentication($this->schemes(), (new RouteSource())->defaultGuard()),
+            authentication: new Authentication($this->schemes(), (new RouteSource())->defaultGuard(...)),
         ));
     }
 
@@ -84,12 +85,13 @@ class BuilderFactory implements CustomBuilderInterface
 
     /**
      * The routes in the `api` middleware group, which leaves out the application's web pages
-     * and most routes packages add, L5-Swagger's own among them with its default config.
+     * and most routes packages add, L5-Swagger's own among them with its default config. They
+     * are read when the document is built.
      *
      * @return iterable<Route>
      */
     protected function routes(): iterable
     {
-        return (new RouteSource())->routes(['api']);
+        return new LazyRoutes(static fn (): array => (new RouteSource())->routes(['api']));
     }
 }

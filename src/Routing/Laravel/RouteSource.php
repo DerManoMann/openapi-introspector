@@ -37,7 +37,7 @@ class RouteSource
     {
         return array_values(array_filter(
             $this->container()->make(Router::class)->getRoutes()->getRoutes(),
-            static fn (Route $route): bool => array_intersect($middleware, $route->middleware()) !== [],
+            static fn (Route $route): bool => array_intersect($middleware, array_filter($route->middleware(), is_string(...))) !== [],
         ));
     }
 

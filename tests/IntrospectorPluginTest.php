@@ -118,6 +118,15 @@ final class IntrospectorPluginTest extends TestCase
         $this->assertSame(['/users', '/admin/users'], array_keys($document['paths']));
     }
 
+    public function testMiddlewareThatIsNotANameIsIgnored(): void
+    {
+        $this->router->get('users', ['middleware' => ['api', static fn (): null => null], 'uses' => UsersController::class . '@index']);
+
+        $document = $this->build([LaravelAdapter::class => []]);
+
+        $this->assertSame(['/users'], array_keys($document['paths']));
+    }
+
     public function testTheRouteSourceSettingNamesWhereTheRoutesComeFrom(): void
     {
         $source = new class () extends RouteSource {

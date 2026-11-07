@@ -99,7 +99,9 @@ class ApiDocsFactory implements CustomBuilderInterface
 ```
 
 It implements L5-Swagger's interface rather than extending `BuilderFactory`, which registers the
-introspector itself. This needs swagger-php 7.3 or later.
+introspector itself. The factory sets the mode, since L5-Swagger's `mode` option does not apply
+to a `builder_factory`, and a logger, where one is wanted, goes to the `Builder` constructor. This
+needs swagger-php 7.3 or later.
 
 ## Before 11.2.1
 
