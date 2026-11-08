@@ -12,7 +12,8 @@ use OpenApi\Spec as OA;
  * the `Authenticate` middleware class or a subclass. A project with middleware of its own lists
  * it in `$names`, which replaces `auth`. A guard becomes a security scheme only where `$schemes`
  * maps it to one, since which scheme a guard means is the application's to say. A bare `auth`
- * uses the `$default` guard.
+ * uses the `$default` guard. Given as a closure, the default is read when a bare `auth` turns up,
+ * for an application whose configuration is not loaded yet when this is created.
  *
  * Passport's scope middleware puts scopes on the requirements: `scopes:a,b`, which needs all of
  * them, on each requirement, and `scope:a,b`, which needs any one, as one requirement per scope.
@@ -27,13 +28,13 @@ class Authentication
     protected const ANY_SCOPE = ['scope', 'Laravel\Passport\Http\Middleware\CheckForAnyScope', 'Laravel\Passport\Http\Middleware\CheckTokenForAnyScope'];
 
     /**
-     * @param array<string, string> $schemes guard name → security scheme name, such as `['sanctum' => 'bearerAuth']`
-     * @param string                $default the guard a bare `auth` uses, Laravel's own default unless the application changed it
-     * @param list<string>          $names   middleware names or classes that authenticate
+     * @param array<string, string>     $schemes guard name → security scheme name, such as `['sanctum' => 'bearerAuth']`
+     * @param string|\Closure(): string $default the guard a bare `auth` uses, Laravel's own default unless the application changed it
+     * @param list<string>              $names   middleware names or classes that authenticate
      */
     public function __construct(
         private readonly array $schemes = [],
-        private readonly string $default = 'web',
+        private readonly string|\Closure $default = 'web',
         private readonly array $names = ['auth'],
     ) {
     }
@@ -60,7 +61,7 @@ class Authentication
             }
 
             $guards ??= [];
-            foreach ($parameters === null ? [$this->default] : explode(',', $parameters) as $guard) {
+            foreach ($parameters === null ? [$this->default instanceof \Closure ? ($this->default)() : $this->default] : explode(',', $parameters) as $guard) {
                 $guards[] = trim($guard);
             }
         }

@@ -30,7 +30,20 @@ _Avoid_: contributor, driver, integration
 A ready-made class that plugs the introspector into another package's extension point, under
 `Integrations\`, such as `Integrations\L5Swagger\BuilderFactory` for L5-Swagger's
 `builder_factory`. It configures adapters, it does not read routes itself.
-_Avoid_: bridge, plugin
+_Avoid_: bridge, plugin (swagger-php's word for its own extension point)
+
+**Plugin**:
+swagger-php's word for a class the builder configures itself with, from 7.3. `IntrospectorPlugin`
+is this package's: it takes adapters ready made, or creates them from **settings** keyed by
+adapter class.
+_Avoid_: using it for an integration
+
+**Settings**:
+The plain values a plugin is configured with, which configuration can hold, such as Laravel's
+under `config:cache`. An adapter behind `ConfigurableAdapterInterface` creates itself from them,
+and `Routing\Laravel\RouteSource` is where a Laravel adapter created that way reads the running
+application.
+_Avoid_: options (the adapter's constructor arguments)
 
 **Handler**:
 The callable a route dispatches to. `Routing\Handler` resolves it to the method reflector the
@@ -81,8 +94,8 @@ _Avoid_: merge (swagger-php's mergers are a different step), override
 - An **adapter** reads **routes** and yields an **operation** for each method and path
 - The **handler** gives an operation its method reflector, and a path parameter its parameter
   reflector where the type is a scalar
-- `Introspector::register()` adds the operations to a `Builder`, and the pipeline **folds**
-  them with the attributes
+- `Introspector::register()` adds the operations to a `Builder`, or to the hooks a **plugin**
+  is given, and the pipeline **folds** them with the attributes
 - The **inventory** records each method and path with its **status**
 
 ## Flagged ambiguities

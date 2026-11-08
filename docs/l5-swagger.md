@@ -72,6 +72,37 @@ The methods to override:
   it takes, such as augmenters
 * `introspector()` - the introspector, for another adapter or a `prefix`
 
+## With the plugin
+
+L5-Swagger has no option for swagger-php plugins, so [`IntrospectorPlugin`](../README.md#as-a-swagger-php-plugin)
+cannot be set up in `config/l5-swagger.php` alone. A `builder_factory` of the project's own adds
+it, with the plugin's settings in the factory:
+
+```php
+use L5Swagger\CustomBuilderInterface;
+use OpenApi\Builder;
+use OpenApi\Builder\Mode;
+use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
+use Radebatz\OpenApi\Introspector\IntrospectorPlugin;
+
+class ApiDocsFactory implements CustomBuilderInterface
+{
+    public function create(): Builder
+    {
+        return (new Builder())
+            ->setMode(Mode::HYBRID)
+            ->withPlugins([
+                IntrospectorPlugin::class => [LaravelAdapter::class => ['schemes' => ['sanctum' => 'bearerAuth']]],
+            ]);
+    }
+}
+```
+
+It implements L5-Swagger's interface rather than extending `BuilderFactory`, which registers the
+introspector itself. The factory sets the mode, since L5-Swagger's `mode` option does not apply
+to a `builder_factory`, and a logger, where one is wanted, goes to the `Builder` constructor. This
+needs swagger-php 7.3 or later.
+
 ## Before 11.2.1
 
 Before 11.2.1, L5-Swagger has no hook for a contribution, so the integration is an artisan

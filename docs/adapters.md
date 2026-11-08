@@ -32,6 +32,11 @@ best passed by name.
 `Handler` and `Constraint` are in `Radebatz\OpenApi\Introspector\Routing`, `ValidationRules`,
 `Authentication` and `Middleware` in `Radebatz\OpenApi\Introspector\Routing\Laravel`.
 
+An adapter behind `ConfigurableAdapterInterface` also creates itself from plain settings, which
+is how [`IntrospectorPlugin`](../README.md#as-a-swagger-php-plugin) builds it from configuration.
+`LaravelAdapter` is one, with [its own settings](laravel.md#from-settings). `SlimAdapter` is not:
+its routes come from the app object, which configuration cannot hold.
+
 ## What a route contributes
 
 * One operation per method and path. A route with several methods on one path, such as Laravel's
