@@ -44,6 +44,48 @@ cannot be read, and the operation then gets only the `422`. The adapter's `logge
 new LaravelAdapter($router, logger: app(LoggerInterface::class));
 ```
 
+## Data objects
+
+[spatie/laravel-data](https://github.com/spatie/laravel-data) objects are described by
+`LaravelDataPlugin`. It works without `IntrospectorPlugin`, on controllers documented with
+attributes, and with it on the routes that plugin reads as well:
+
+```php
+use Radebatz\OpenApi\Introspector\LaravelDataPlugin;
+
+$builder->withPlugins([LaravelDataPlugin::class]);
+```
+
+The package declares it for swagger-php's plugin discovery, so with swagger-php 7.6 or later
+`$builder->withDiscoveredPlugins()` finds it as well. It takes no settings, and does nothing where
+laravel-data is not installed.
+
+A handler that takes a data object gets the following, whether `IntrospectorPlugin` reads it from a
+route or it carries OpenApi attributes:
+
+* the data object as its request body, and a `422` response, since laravel-data validates it first
+* a `200` response with the data object, where the handler's return type is a data class
+
+A request body or a `2xx` response the operation already has wins. The `422` is added either way.
+
+Each data class an operation uses becomes a component, and so does each data class it holds, as a
+property or in a collection:
+
+* the properties are the ones the object outputs, under their mapped names, without the
+  `#[Hidden]` ones
+* the types come from the PHP types, so a nested data object is a reference to its component
+* the constraints and `required` come from the rules laravel-data validates the class with, read
+  the same way as a [form request's rules](#form-requests). A rule with no schema equivalent, such
+  as `exists`, is left out
+
+Where the request and the response differ, through mapped names, `#[Hidden]` or `#[Computed]`, the
+request body references a second component for the input: the properties laravel-data reads,
+under their input names, without the computed ones.
+
+The data classes are read through laravel-data's configuration in Laravel's container, so the
+application has to be booted, as it is in an artisan command. Where it is not, a data class is not
+described, and swagger-php's logger gets a warning naming the class.
+
 ## Authentication
 
 A route behind authentication middleware gets a `401` response. The middleware is the route's
