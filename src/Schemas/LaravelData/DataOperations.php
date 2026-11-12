@@ -22,7 +22,7 @@ use Spatie\LaravelData\Contracts\BaseData;
  *
  * Where the class's request and response differ, the request body references its input schema.
  *
- * It runs as an augmenter at the start of the resolve phase, after `IntrospectorPlugin` has added
+ * It runs as an augmenter at the start of the resolve phase, after `RoutesPlugin` has added
  * the operations it reads from routes, and before swagger-php reads types and rewrites references.
  * Augmenters do not ask the resolvers, so it adds the components it references itself, through
  * `DataResolver`, together with the data classes they hold.

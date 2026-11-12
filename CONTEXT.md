@@ -1,7 +1,8 @@
 # openapi-introspector
 
-Reads a PHP framework's routes and contributes them to the OpenAPI document swagger-php builds,
-so routes nobody has documented still appear, and documentation without a route is reported.
+Reads what a PHP application's framework and libraries already know, its routes and its
+spatie/laravel-data objects, and contributes it to the OpenAPI document swagger-php builds, through
+one plugin per source. The routes are the `Routing\` domain, data objects the `Schemas\` one.
 
 Terminology for this package. swagger-php's own vocabulary is defined in
 [its CONTEXT.md](https://github.com/zircote/swagger-php/blob/master/CONTEXT.md) and is not
@@ -33,9 +34,10 @@ A ready-made class that plugs the introspector into another package's extension 
 _Avoid_: bridge, plugin (swagger-php's word for its own extension point)
 
 **Plugin**:
-swagger-php's word for a class the builder configures itself with, from 7.3. `IntrospectorPlugin`
-is this package's: it takes adapters ready made, or creates them from **settings** keyed by
-adapter class.
+swagger-php's word for a class the builder configures itself with, from 7.3. This package ships one
+per independent source, at its root: `RoutesPlugin` takes adapters ready made, or creates them from
+**settings** keyed by adapter class; `LaravelDataPlugin` describes spatie/laravel-data objects.
+`IntrospectorPlugin` is `RoutesPlugin`'s name before 1.5, deprecated until 2.0.
 _Avoid_: using it for an integration
 
 **Settings**:
@@ -94,7 +96,7 @@ _Avoid_: merge (swagger-php's mergers are a different step), override
 - An **adapter** reads **routes** and yields an **operation** for each method and path
 - The **handler** gives an operation its method reflector, and a path parameter its parameter
   reflector where the type is a scalar
-- `Introspector::register()` adds the operations to a `Builder`, or to the hooks a **plugin**
+- `RouteIntrospector::register()` adds the operations to a `Builder`, or to the hooks a **plugin**
   is given, and the pipeline **folds** them with the attributes
 - The **inventory** records each method and path with its **status**
 

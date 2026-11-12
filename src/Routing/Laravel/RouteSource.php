@@ -5,7 +5,6 @@ namespace Radebatz\OpenApi\Introspector\Routing\Laravel;
 use Illuminate\Container\Container;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
-use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 
 /**
  * What the introspector reads from a running Laravel application: the routes to document, and

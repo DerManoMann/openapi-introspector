@@ -29,7 +29,7 @@ use Illuminate\Routing\RedirectController;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 use Illuminate\Routing\ViewController;
-use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\LaravelAdapter;
 
 $vendor = base_path('vendor');
 

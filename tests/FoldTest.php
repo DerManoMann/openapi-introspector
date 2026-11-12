@@ -10,10 +10,10 @@ use OpenApi\Spec as OA;
 use OpenApi\Specification;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
-use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
-use Radebatz\OpenApi\Introspector\Introspector;
 use Radebatz\OpenApi\Introspector\Routing\Laravel\Authentication;
-use Radebatz\OpenApi\Introspector\Status;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\LaravelAdapter;
+use Radebatz\OpenApi\Introspector\Routing\RouteIntrospector;
+use Radebatz\OpenApi\Introspector\Routing\Status;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\AccountController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\AttributedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\FormRequestController;
@@ -200,7 +200,7 @@ final class FoldTest extends TestCase
                 }
             }
         };
-        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router));
+        $introspector = (new RouteIntrospector())->addAdapter(new LaravelAdapter($router));
         $document = $introspector->register($this->builder(StackedController::class)->setLogger($logger))->build()->toArray();
 
         $this->assertSame('List accounts', $document['paths']['/accounts']['get']['summary'], 'the documented operation stands');
@@ -228,7 +228,7 @@ final class FoldTest extends TestCase
         $router->get('api/users', [UsersController::class, 'index']);
         $router->get('api/ping', [UsersController::class, 'show']);
 
-        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router, prefix: '/api'));
+        $introspector = (new RouteIntrospector())->addAdapter(new LaravelAdapter($router, prefix: '/api'));
         $document = $introspector->register($this->builder(AttributedController::class))->build()->toArray();
 
         $this->assertSame('All the users', $document['paths']['/users']['get']['summary']);
@@ -360,7 +360,7 @@ final class FoldTest extends TestCase
         $router->get('api/users/{id}', [PrefixedController::class, 'show'])->where('id', '[0-9]+');
         $router->get('ping', static fn (): string => 'pong');
 
-        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router));
+        $introspector = (new RouteIntrospector())->addAdapter(new LaravelAdapter($router));
         $first = $introspector->register($this->builder(PrefixedController::class))->build()->toArray();
         $second = $introspector->register($this->builder(PrefixedController::class))->build()->toArray();
 
@@ -411,7 +411,7 @@ final class FoldTest extends TestCase
         $router->get('public', [AccountController::class, 'public'])->middleware('auth:sanctum');
         $router->get('described', [AccountController::class, 'described'])->middleware('auth:sanctum');
 
-        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router, authentication: new Authentication(['sanctum' => 'bearerAuth'])));
+        $introspector = (new RouteIntrospector())->addAdapter(new LaravelAdapter($router, authentication: new Authentication(['sanctum' => 'bearerAuth'])));
         $document = $introspector->register($this->builder(AccountController::class))->build()->toArray();
 
         $this->assertSame([['bearerAuth' => []]], $document['paths']['/account']['get']['security'] ?? null);
@@ -423,11 +423,11 @@ final class FoldTest extends TestCase
     /**
      * @param class-string $source
      *
-     * @return array{array<string, mixed>, Introspector}
+     * @return array{array<string, mixed>, RouteIntrospector}
      */
     private function build(Router $router, string $source): array
     {
-        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router));
+        $introspector = (new RouteIntrospector())->addAdapter(new LaravelAdapter($router));
         $document = $introspector->register($this->builder($source))->build()->toArray();
 
         return [$document, $introspector];

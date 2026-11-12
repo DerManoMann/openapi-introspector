@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Radebatz\OpenApi\Introspector\Tests;
+namespace Radebatz\OpenApi\Introspector\Tests\Routing;
 
 use Illuminate\Events\Dispatcher;
 use Illuminate\Routing\Router;
@@ -9,12 +9,12 @@ use OpenApi\Builder\Mode;
 use OpenApi\Spec as OA;
 use OpenApi\Specification;
 use PHPUnit\Framework\TestCase;
-use Radebatz\OpenApi\Introspector\AdapterInterface;
-use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
-use Radebatz\OpenApi\Introspector\Introspector;
-use Radebatz\OpenApi\Introspector\Inventory\Entry;
+use Radebatz\OpenApi\Introspector\Routing\AdapterInterface;
+use Radebatz\OpenApi\Introspector\Routing\Inventory\Entry;
 use Radebatz\OpenApi\Introspector\Routing\Laravel\Authentication;
-use Radebatz\OpenApi\Introspector\Status;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\LaravelAdapter;
+use Radebatz\OpenApi\Introspector\Routing\RouteIntrospector;
+use Radebatz\OpenApi\Introspector\Routing\Status;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\AccountController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\AttributedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\PostsController;
@@ -26,14 +26,14 @@ use Radebatz\OpenApi\Introspector\Tests\Fixtures\UsersController;
  * document through the pipeline, attributes win where they already describe a route, and
  * the inventory says which was which.
  */
-final class IntrospectorTest extends TestCase
+final class RouteIntrospectorTest extends TestCase
 {
     public function testARoutedOperationIsDerivedFromItsHandler(): void
     {
         $router = new Router(new Dispatcher());
         $router->get('users/{id}', [UsersController::class, 'show'])->where('id', '[0-9]+');
 
-        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router));
+        $introspector = (new RouteIntrospector())->addAdapter(new LaravelAdapter($router));
         $document = $introspector->register($this->builder())->build()->toArray();
 
         $operation = $document['paths']['/users/{id}']['get'];
@@ -54,7 +54,7 @@ final class IntrospectorTest extends TestCase
         $router = new Router(new Dispatcher());
         $router->get('users', [UsersController::class, 'index']);
 
-        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router));
+        $introspector = (new RouteIntrospector())->addAdapter(new LaravelAdapter($router));
         $document = $introspector->register($this->builder()->addSource(new \ReflectionClass(AttributedController::class)))
             ->build()
             ->toArray();
@@ -71,7 +71,7 @@ final class IntrospectorTest extends TestCase
 
     public function testADescribedOperationNoRouteServesIsUnrouted(): void
     {
-        $introspector = (new Introspector())->addAdapter(new LaravelAdapter(new Router(new Dispatcher())));
+        $introspector = (new RouteIntrospector())->addAdapter(new LaravelAdapter(new Router(new Dispatcher())));
         $document = $introspector->register($this->builder()->addSource(new \ReflectionClass(AttributedController::class)))
             ->build()
             ->toArray();
@@ -90,7 +90,7 @@ final class IntrospectorTest extends TestCase
         $router = new Router(new Dispatcher());
         $router->get('ping', static fn (): string => 'pong');
 
-        $document = (new Introspector())->addAdapter(new LaravelAdapter($router))
+        $document = (new RouteIntrospector())->addAdapter(new LaravelAdapter($router))
             ->register($this->builder())
             ->build()
             ->toArray();
@@ -102,7 +102,7 @@ final class IntrospectorTest extends TestCase
 
     public function testTheFirstAdapterToYieldAKeyWins(): void
     {
-        $introspector = (new Introspector())->addAdapter(
+        $introspector = (new RouteIntrospector())->addAdapter(
             $this->adapter(new OA\Operation\Get(path: '/things', operationId: 'first')),
             $this->adapter(new OA\Operation\Get(path: '/things', operationId: 'second')),
         );
@@ -117,7 +117,7 @@ final class IntrospectorTest extends TestCase
 
     public function testAnOperationWithoutAPathIsADefectInTheAdapter(): void
     {
-        $introspector = (new Introspector())->addAdapter($this->adapter(new OA\Operation(method: 'get')));
+        $introspector = (new RouteIntrospector())->addAdapter($this->adapter(new OA\Operation(method: 'get')));
 
         $this->expectException(\InvalidArgumentException::class);
         $introspector->introspect(new Specification());
@@ -126,7 +126,7 @@ final class IntrospectorTest extends TestCase
     public function testTheInventoryExistsOnlyAfterIntrospection(): void
     {
         $this->expectException(\LogicException::class);
-        (new Introspector())->inventory();
+        (new RouteIntrospector())->inventory();
     }
 
     public function testAPathParameterTakesItsTypeFromTheSignature(): void
@@ -137,7 +137,7 @@ final class IntrospectorTest extends TestCase
         $router->get('digits/{slug}', [TypedController::class, 'text'])->where('slug', '[0-9]+');
         $router->get('bound/{user}', [TypedController::class, 'bound']);
 
-        $document = (new Introspector())->addAdapter(new LaravelAdapter($router))->register($this->builder())->build()->toArray();
+        $document = (new RouteIntrospector())->addAdapter(new LaravelAdapter($router))->register($this->builder())->build()->toArray();
         $type = static fn (string $path): mixed => $document['paths'][$path]['get']['parameters'][0]['schema']['type'] ?? null;
 
         $this->assertSame('integer', $type('/number/{id}'));
@@ -151,7 +151,7 @@ final class IntrospectorTest extends TestCase
         $router = new Router(new Dispatcher());
         $router->get('posts/{post}', [PostsController::class, 'show']);
 
-        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router));
+        $introspector = (new RouteIntrospector())->addAdapter(new LaravelAdapter($router));
         $first = $introspector->register($this->builder())->build()->toArray();
         $second = $introspector->register($this->builder())->build()->toArray();
 
@@ -164,7 +164,7 @@ final class IntrospectorTest extends TestCase
         $router = new Router(new Dispatcher());
         $router->get('account', [AccountController::class, 'show'])->middleware('auth:sanctum');
 
-        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router, authentication: new Authentication(['sanctum' => 'bearerAuth'])));
+        $introspector = (new RouteIntrospector())->addAdapter(new LaravelAdapter($router, authentication: new Authentication(['sanctum' => 'bearerAuth'])));
         $first = $introspector->register($this->builder())->build()->toArray();
         $second = $introspector->register($this->builder())->build()->toArray();
 

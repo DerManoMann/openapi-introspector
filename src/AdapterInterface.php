@@ -2,21 +2,13 @@
 
 namespace Radebatz\OpenApi\Introspector;
 
-use OpenApi\Spec as OA;
+class_alias(Routing\AdapterInterface::class, AdapterInterface::class);
 
-/**
- * Reads what one framework knows about the API it serves.
- *
- * An adapter yields one partial operation per method and path the framework routes, each with
- * a path and a method, and says nothing about what it cannot see. Where the route dispatches
- * to a class method, the operation carries that method's reflector, and the pipeline derives
- * the rest from it. Anything reachable by reflection on an attribute is not an adapter's job;
- * swagger-php's translators cover that.
- */
-interface AdapterInterface
-{
+if (false) {
     /**
-     * @return iterable<OA\Operation>
+     * @deprecated since 1.5, removed in 2.0 - use {@see Routing\AdapterInterface}
      */
-    public function operations(): iterable;
+    interface AdapterInterface
+    {
+    }
 }

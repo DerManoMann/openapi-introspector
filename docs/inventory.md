@@ -12,7 +12,7 @@ framework routes and one only attributes describe look the same, so it cannot be
 It is available once the build has run:
 
 ```php
-use Radebatz\OpenApi\Introspector\Status;
+use Radebatz\OpenApi\Introspector\Routing\Status;
 
 $introspector->register($builder)->build();
 

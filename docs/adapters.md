@@ -5,8 +5,8 @@ it routes. The introspector folds those into the document the builder assembles,
 [What wins](fold.md).
 
 ```php
-use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
-use Radebatz\OpenApi\Introspector\Adapters\SlimAdapter;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\LaravelAdapter;
+use Radebatz\OpenApi\Introspector\Routing\Slim\SlimAdapter;
 
 new LaravelAdapter($router);
 new SlimAdapter($app->getRouteCollector());
@@ -33,7 +33,7 @@ best passed by name.
 `Authentication` and `Middleware` in `Radebatz\OpenApi\Introspector\Routing\Laravel`.
 
 An adapter behind `ConfigurableAdapterInterface` also creates itself from plain settings, which
-is how [`IntrospectorPlugin`](../README.md#as-a-swagger-php-plugin) builds it from configuration.
+is how [`RoutesPlugin`](../README.md#as-a-plugin) builds it from configuration.
 `LaravelAdapter` is one, with [its own settings](laravel.md#from-settings). `SlimAdapter` is not:
 its routes come from the app object, which configuration cannot hold.
 

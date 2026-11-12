@@ -74,7 +74,7 @@ The methods to override:
 
 ## With the plugin
 
-L5-Swagger has no option for swagger-php plugins, so [`IntrospectorPlugin`](../README.md#as-a-swagger-php-plugin)
+L5-Swagger has no option for swagger-php plugins, so [`RoutesPlugin`](../README.md#as-a-plugin)
 cannot be set up in `config/l5-swagger.php` alone. A `builder_factory` of the project's own adds
 it, with the plugin's settings in the factory:
 
@@ -82,8 +82,8 @@ it, with the plugin's settings in the factory:
 use L5Swagger\CustomBuilderInterface;
 use OpenApi\Builder;
 use OpenApi\Builder\Mode;
-use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
-use Radebatz\OpenApi\Introspector\IntrospectorPlugin;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\LaravelAdapter;
+use Radebatz\OpenApi\Introspector\RoutesPlugin;
 
 class ApiDocsFactory implements CustomBuilderInterface
 {
@@ -92,7 +92,7 @@ class ApiDocsFactory implements CustomBuilderInterface
         return (new Builder())
             ->setMode(Mode::HYBRID)
             ->withPlugins([
-                IntrospectorPlugin::class => [LaravelAdapter::class => ['schemes' => ['sanctum' => 'bearerAuth']]],
+                RoutesPlugin::class => [LaravelAdapter::class => ['schemes' => ['sanctum' => 'bearerAuth']]],
             ]);
     }
 }
@@ -113,9 +113,9 @@ use Illuminate\Console\Command;
 use Illuminate\Routing\Router;
 use OpenApi\Builder;
 use OpenApi\Builder\Mode;
-use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
-use Radebatz\OpenApi\Introspector\Introspector;
-use Radebatz\OpenApi\Introspector\Status;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\LaravelAdapter;
+use Radebatz\OpenApi\Introspector\Routing\RouteIntrospector;
+use Radebatz\OpenApi\Introspector\Routing\Status;
 
 final class GenerateApiDocs extends Command
 {
@@ -125,7 +125,7 @@ final class GenerateApiDocs extends Command
 
     public function handle(Router $router): int
     {
-        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router));
+        $introspector = (new RouteIntrospector())->addAdapter(new LaravelAdapter($router));
 
         $introspector
             ->register((new Builder())->setMode(Mode::SPEC)->addSource(app_path()))

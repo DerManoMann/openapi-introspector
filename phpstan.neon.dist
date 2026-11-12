@@ -9,4 +9,14 @@ parameters:
         processTimeout: 300.0
     excludePaths:
         - 'tests/Fixtures/*'
+        # the names before 1.5: a class_alias each, with an unreachable stub so an IDE shows the deprecation
+        - 'src/Adapters/*'
+        - 'src/Inventory/*'
+        - 'src/AdapterInterface.php'
+        - 'src/ConfigurableAdapterInterface.php'
+        - 'src/Introspector.php'
+        - 'src/IntrospectorPlugin.php'
+        - 'src/Inventory.php'
+        - 'src/RouteTranslator.php'
+        - 'src/Status.php'
     treatPhpDocTypesAsCertain: false

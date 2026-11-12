@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Radebatz\OpenApi\Introspector\Tests\Adapters;
+namespace Radebatz\OpenApi\Introspector\Tests\Routing\Laravel;
 
 use Illuminate\Events\Dispatcher;
 use Illuminate\Routing\Route;
@@ -8,8 +8,8 @@ use Illuminate\Routing\Router;
 use OpenApi\Spec as OA;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
-use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Routing\Laravel\Authentication;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\AccountController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\FormRequestController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\PingController;
