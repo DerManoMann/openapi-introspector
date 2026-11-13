@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Radebatz\OpenApi\Introspector;
+namespace Radebatz\OpenApi\Introspector\Routing;
 
 use OpenApi\Augmenter\Group;
 use OpenApi\Specification;
@@ -21,7 +21,7 @@ final class IntrospectionAugmenter implements PipeInterface, LoggerAwareInterfac
 {
     use LoggerAwareTrait;
 
-    public function __construct(private readonly Introspector $introspector)
+    public function __construct(private readonly RouteIntrospector $introspector)
     {
     }
 

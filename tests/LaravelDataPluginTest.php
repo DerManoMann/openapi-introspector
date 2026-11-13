@@ -8,9 +8,9 @@ use OpenApi\Spec as OA;
 use OpenApi\Specification;
 use Orchestra\Testbench\TestCase;
 use PHPUnit\Framework\Attributes\RequiresMethod;
-use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
-use Radebatz\OpenApi\Introspector\IntrospectorPlugin;
 use Radebatz\OpenApi\Introspector\LaravelDataPlugin;
+use Radebatz\OpenApi\Introspector\RoutesPlugin;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\LaravelData\PlainTagController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\LaravelData\TagController;
 use Spatie\LaravelData\LaravelDataServiceProvider;
@@ -102,7 +102,7 @@ final class LaravelDataPluginTest extends TestCase
         $result = (new Builder())
             ->setMode(Mode::SPEC)
             ->withSpecification(fn (Specification $specification): Specification => $specification->add(new OA\Info(title: 'Data', version: '1.0.0')))
-            ->withPlugins([IntrospectorPlugin::class => [LaravelAdapter::class => []], LaravelDataPlugin::class])
+            ->withPlugins([RoutesPlugin::class => [LaravelAdapter::class => []], LaravelDataPlugin::class])
             ->build();
         $operation = $result->toArray()['paths']['/tags']['post'];
 

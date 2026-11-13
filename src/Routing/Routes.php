@@ -4,8 +4,7 @@ namespace Radebatz\OpenApi\Introspector\Routing;
 
 use OpenApi\Spec as OA;
 use OpenApi\Utils\SourceLocation;
-use Radebatz\OpenApi\Introspector\AdapterInterface;
-use Radebatz\OpenApi\Introspector\Inventory\Entry;
+use Radebatz\OpenApi\Introspector\Routing\Inventory\Entry;
 
 /**
  * Every operation the adapters yield, read once, and indexed by the handler method serving it.

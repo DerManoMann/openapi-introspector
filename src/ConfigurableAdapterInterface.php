@@ -2,21 +2,13 @@
 
 namespace Radebatz\OpenApi\Introspector;
 
-use Psr\Log\LoggerInterface;
+class_alias(Routing\ConfigurableAdapterInterface::class, ConfigurableAdapterInterface::class);
 
-/**
- * An adapter that can create itself from plain settings, so configuration can name it.
- *
- * The adapter finds what it reads on its own, such as the framework's router, and the settings
- * only adjust its defaults. An adapter that needs objects from the application to be handed to
- * it cannot implement this, and is given to {@see IntrospectorPlugin} as an instance instead.
- */
-interface ConfigurableAdapterInterface extends AdapterInterface
-{
+if (false) {
     /**
-     * @param array<string, mixed> $config the adapter's settings, empty for its defaults
-     *
-     * @throws \InvalidArgumentException for a setting it does not know, or a value it cannot use
+     * @deprecated since 1.5, removed in 2.0 - use {@see Routing\ConfigurableAdapterInterface}
      */
-    public static function fromConfig(array $config, ?LoggerInterface $logger = null): static;
+    interface ConfigurableAdapterInterface
+    {
+    }
 }

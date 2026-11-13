@@ -9,9 +9,9 @@ use OpenApi\Builder\Mode;
 use OpenApi\Spec as OA;
 use OpenApi\Specification;
 use PHPUnit\Framework\TestCase;
-use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
-use Radebatz\OpenApi\Introspector\Introspector;
-use Radebatz\OpenApi\Introspector\Status;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\LaravelAdapter;
+use Radebatz\OpenApi\Introspector\Routing\RouteIntrospector;
+use Radebatz\OpenApi\Introspector\Routing\Status;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\ClassicController;
 
 /**
@@ -47,11 +47,11 @@ final class HybridTest extends TestCase
     }
 
     /**
-     * @return array{array<string, mixed>, Introspector}
+     * @return array{array<string, mixed>, RouteIntrospector}
      */
     private function build(Router $router): array
     {
-        $introspector = (new Introspector())->addAdapter(new LaravelAdapter($router));
+        $introspector = (new RouteIntrospector())->addAdapter(new LaravelAdapter($router));
         $builder = (new Builder())
             ->setMode(Mode::HYBRID)
             ->addSource(__DIR__ . '/Fixtures/ClassicController.php')

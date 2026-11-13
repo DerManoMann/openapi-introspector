@@ -15,11 +15,20 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RequiresMethod;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
-use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
-use Radebatz\OpenApi\Introspector\Adapters\SlimAdapter;
+use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter as OldLaravelAdapter;
 use Radebatz\OpenApi\Introspector\Introspector;
 use Radebatz\OpenApi\Introspector\IntrospectorPlugin;
+use Radebatz\OpenApi\Introspector\RoutesPlugin;
+use Radebatz\OpenApi\Introspector\Routing\AdapterInterface;
+use Radebatz\OpenApi\Introspector\Routing\ConfigurableAdapterInterface;
+use Radebatz\OpenApi\Introspector\Routing\Inventory;
+use Radebatz\OpenApi\Introspector\Routing\Inventory\Entry;
+use Radebatz\OpenApi\Introspector\Routing\Laravel\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\Routing\Laravel\RouteSource;
+use Radebatz\OpenApi\Introspector\Routing\RouteIntrospector;
+use Radebatz\OpenApi\Introspector\Routing\RouteTranslator;
+use Radebatz\OpenApi\Introspector\Routing\Slim\SlimAdapter;
+use Radebatz\OpenApi\Introspector\Routing\Status;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\AccountController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\FormRequestController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\UsersController;
@@ -29,7 +38,7 @@ use Radebatz\OpenApi\Introspector\Tests\Fixtures\UsersController;
  * container as in a running Laravel application.
  */
 #[RequiresMethod(Builder::class, 'withPlugins')]
-final class IntrospectorPluginTest extends TestCase
+final class RoutesPluginTest extends TestCase
 {
     private Router $router;
 
@@ -50,8 +59,8 @@ final class IntrospectorPluginTest extends TestCase
     {
         $this->router->get('users/{id}', [UsersController::class, 'show']);
 
-        $expected = (new Introspector())->addAdapter(new LaravelAdapter($this->router))->register($this->builder())->build();
-        $result = $this->builder()->withPlugins([new IntrospectorPlugin(new LaravelAdapter($this->router))])->build();
+        $expected = (new RouteIntrospector())->addAdapter(new LaravelAdapter($this->router))->register($this->builder())->build();
+        $result = $this->builder()->withPlugins([new RoutesPlugin(new LaravelAdapter($this->router))])->build();
 
         $this->assertTrue($result->isValid());
         $this->assertEquals($expected->toArray(), $result->toArray());
@@ -65,6 +74,46 @@ final class IntrospectorPluginTest extends TestCase
         $document = $this->build([LaravelAdapter::class => []]);
 
         $this->assertSame(['/users'], array_keys($document['paths']));
+    }
+
+    /**
+     * The names before 1.5, deprecated until 2.0.
+     */
+    public function testTheOldNamesStillConfigureTheBuild(): void
+    {
+        $this->router->middleware('api')->get('users', [UsersController::class, 'index']);
+
+        $result = $this->builder()->withPlugins([IntrospectorPlugin::class => [OldLaravelAdapter::class => []]])->build();
+
+        $this->assertTrue($result->isValid());
+        $this->assertSame(['/users'], array_keys($result->toArray()['paths']));
+    }
+
+    /**
+     * @return iterable<string, array{string, class-string}>
+     */
+    public static function renamed(): iterable
+    {
+        yield 'Introspector' => [Introspector::class, RouteIntrospector::class];
+        yield 'IntrospectorPlugin' => [IntrospectorPlugin::class, RoutesPlugin::class];
+        yield 'Adapters\\LaravelAdapter' => [OldLaravelAdapter::class, LaravelAdapter::class];
+        yield 'Adapters\\SlimAdapter' => [\Radebatz\OpenApi\Introspector\Adapters\SlimAdapter::class, SlimAdapter::class];
+        yield 'AdapterInterface' => [\Radebatz\OpenApi\Introspector\AdapterInterface::class, AdapterInterface::class];
+        yield 'ConfigurableAdapterInterface' => [\Radebatz\OpenApi\Introspector\ConfigurableAdapterInterface::class, ConfigurableAdapterInterface::class];
+        yield 'Inventory' => [\Radebatz\OpenApi\Introspector\Inventory::class, Inventory::class];
+        yield 'Inventory\\Entry' => [\Radebatz\OpenApi\Introspector\Inventory\Entry::class, Entry::class];
+        yield 'Status' => [\Radebatz\OpenApi\Introspector\Status::class, Status::class];
+        yield 'RouteTranslator' => [\Radebatz\OpenApi\Introspector\RouteTranslator::class, RouteTranslator::class];
+    }
+
+    /**
+     * A name from before 1.5 is the moved class itself, deprecated until 2.0.
+     */
+    #[DataProvider('renamed')]
+    public function testAnOldNameIsTheMovedClass(string $old, string $new): void
+    {
+        // one and the same class, interface or enum when each is the other
+        $this->assertTrue(is_a($old, $new, true) && is_a($new, $old, true));
     }
 
     public function testTheSettingsGoToTheNamedAdapter(): void
@@ -97,7 +146,7 @@ final class IntrospectorPluginTest extends TestCase
 
     public function testTheRoutesAndTheDefaultGuardAreReadWhenTheDocumentIsBuilt(): void
     {
-        $builder = $this->builder()->withPlugins([IntrospectorPlugin::class => [LaravelAdapter::class => ['schemes' => ['sanctum' => 'bearerAuth']]]]);
+        $builder = $this->builder()->withPlugins([RoutesPlugin::class => [LaravelAdapter::class => ['schemes' => ['sanctum' => 'bearerAuth']]]]);
 
         Container::getInstance()->instance('config', new Repository(['auth' => ['defaults' => ['guard' => 'sanctum']]]));
         $this->router->middleware(['api', 'auth'])->get('account', [AccountController::class, 'show']);
@@ -164,7 +213,7 @@ final class IntrospectorPluginTest extends TestCase
             ->withSpecification(static function (Specification $specification): void {
                 $specification->add(new OA\Info(title: 'Introspected', version: '1.0.0'));
             })
-            ->withPlugins([IntrospectorPlugin::class => [LaravelAdapter::class => []]])
+            ->withPlugins([RoutesPlugin::class => [LaravelAdapter::class => []]])
             ->build();
 
         $this->assertNotEmpty(array_filter($logger->messages, static fn (string $message): bool => str_contains($message, 'rules')));
@@ -198,7 +247,7 @@ final class IntrospectorPluginTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage($message);
 
-        (new Builder())->withPlugins([IntrospectorPlugin::class => $settings]);
+        (new Builder())->withPlugins([RoutesPlugin::class => $settings]);
     }
 
     /**
@@ -208,7 +257,7 @@ final class IntrospectorPluginTest extends TestCase
      */
     private function build(array $settings): array
     {
-        $result = $this->builder()->withPlugins([IntrospectorPlugin::class => $settings])->build();
+        $result = $this->builder()->withPlugins([RoutesPlugin::class => $settings])->build();
         $this->assertTrue($result->isValid());
 
         return $result->toArray();

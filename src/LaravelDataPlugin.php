@@ -20,7 +20,7 @@ use Spatie\LaravelData\Contracts\BaseData;
  * (new Builder())->withPlugins([LaravelDataPlugin::class]);
  * ```
  *
- * It works without `IntrospectorPlugin`, on controllers documented with attributes, and with it on
+ * It works without `RoutesPlugin`, on controllers documented with attributes, and with it on
  * the routes that plugin reads as well. It takes no settings, and does nothing where
  * laravel-data is not installed. The package
  * declares it for swagger-php's plugin discovery (7.6 or later), so
@@ -44,7 +44,7 @@ class LaravelDataPlugin implements PluginInterface
                 $resolvers->add(new DataResolver());
             });
         });
-        // after IntrospectorPlugin's augmenter, which always goes first, and before types are read
+        // after RoutesPlugin's augmenter, which always goes first, and before types are read
         $hooks->withAugmenters(static fn (Pipeline $augmenters): Pipeline => $augmenters->insert(new DataOperations(), Inheritance::class));
     }
 }

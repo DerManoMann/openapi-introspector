@@ -1,11 +1,11 @@
 <?php declare(strict_types=1);
 
-namespace Radebatz\OpenApi\Introspector\Tests\Adapters;
+namespace Radebatz\OpenApi\Introspector\Tests\Routing\Slim;
 
 use OpenApi\Spec as OA;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
-use Radebatz\OpenApi\Introspector\Adapters\SlimAdapter;
+use Radebatz\OpenApi\Introspector\Routing\Slim\SlimAdapter;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\PingController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\TypedController;
 use Radebatz\OpenApi\Introspector\Tests\Fixtures\UsersController;

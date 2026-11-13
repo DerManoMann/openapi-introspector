@@ -47,7 +47,7 @@ new LaravelAdapter($router, logger: app(LoggerInterface::class));
 ## Data objects
 
 [spatie/laravel-data](https://github.com/spatie/laravel-data) objects are described by
-`LaravelDataPlugin`. It works without `IntrospectorPlugin`, on controllers documented with
+`LaravelDataPlugin`. It works without `RoutesPlugin`, on controllers documented with
 attributes, and with it on the routes that plugin reads as well:
 
 ```php
@@ -60,7 +60,7 @@ The package declares it for swagger-php's plugin discovery, so with swagger-php 
 `$builder->withDiscoveredPlugins()` finds it as well. It takes no settings, and does nothing where
 laravel-data is not installed.
 
-A handler that takes a data object gets the following, whether `IntrospectorPlugin` reads it from a
+A handler that takes a data object gets the following, whether `RoutesPlugin` reads it from a
 route or it carries OpenApi attributes:
 
 * the data object as its request body, and a `422` response, since laravel-data validates it first
@@ -171,7 +171,7 @@ A response the attributes declare for the same status code wins.
 ## From settings
 
 `LaravelAdapter::fromConfig()` creates the adapter from plain settings, reading the routes from the
-application's container. That is what [`IntrospectorPlugin`](../README.md#as-a-swagger-php-plugin)
+application's container. That is what [`RoutesPlugin`](../README.md#as-a-plugin)
 uses when its settings name `LaravelAdapter`. The settings, all optional:
 
 * `middleware` - the middleware group whose routes are documented, or a list of groups, `api` by
@@ -211,7 +211,7 @@ class V2Routes extends RouteSource
 ```
 
 ```php
-IntrospectorPlugin::class => [LaravelAdapter::class => ['routeSource' => V2Routes::class]],
+RoutesPlugin::class => [LaravelAdapter::class => ['routeSource' => V2Routes::class]],
 ```
 
 Anything beyond these, such as a `prefix` or middleware of a project's own, needs the adapter
