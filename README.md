@@ -113,13 +113,18 @@ so there it takes a [`builder_factory`](docs/l5-swagger.md#with-the-plugin) of t
 The plugin keeps the introspector to itself, so a build that needs the inventory uses
 `register()`. Plugins are not used in classic mode.
 
+The package also ships `LaravelDataPlugin`, which describes spatie/laravel-data objects as schemas,
+request bodies and responses. It works without `IntrospectorPlugin`, on controllers documented with
+attributes, and with it on the routes that plugin reads as well.
+[Data objects](docs/laravel.md#data-objects) shows how to add it.
+
 ## Documentation
 
 * [Routes](docs/routes.md) - where the routes come from, choosing them, and paths relative to a
   server
 * [Adapters](docs/adapters.md) - what a route contributes, and the adapters' options
-* [Laravel](docs/laravel.md) - model binding, form requests, authentication, other middleware,
-  and the adapter from settings
+* [Laravel](docs/laravel.md) - model binding, form requests, data objects, authentication, other
+  middleware, and the adapter from settings
 * [What wins](docs/fold.md) - how routes and attributes fold together
 * [The inventory](docs/inventory.md) - which endpoints are documented, routed, or both
 * [Generating for L5-Swagger](docs/l5-swagger.md)

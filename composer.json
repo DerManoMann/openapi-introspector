@@ -53,6 +53,11 @@
     "extra": {
         "branch-alias": {
             "dev-main": "1.x-dev"
+        },
+        "swagger-php": {
+            "plugins": [
+                "Radebatz\\OpenApi\\Introspector\\LaravelDataPlugin"
+            ]
         }
     },
     "require": {
@@ -65,13 +70,16 @@
         "friendsofphp/php-cs-fixer": "^3.62.0",
         "laravel/framework": "^12.0 || ^13.0",
         "nyholm/psr7": "^1.8",
+        "orchestra/testbench": "^10.0 || ^11.0",
         "phpstan/phpstan": "^2.1",
         "phpunit/phpunit": "^11.5",
         "rector/rector": "^2.0",
-        "slim/slim": "^4.0"
+        "slim/slim": "^4.0",
+        "spatie/laravel-data": "^4.23"
     },
     "suggest": {
         "darkaonline/l5-swagger": "Serves the document in a Laravel application; Integrations\\L5Swagger\\BuilderFactory plugs the introspector into its builder_factory option (11.2.1 or later)",
-        "radebatz/openapi-verifier": "Verifies responses against the document, in Laravel and Slim tests, as PSR-15 middleware or in Guzzle and PSR-18 clients"
+        "radebatz/openapi-verifier": "Verifies responses against the document, in Laravel and Slim tests, as PSR-15 middleware or in Guzzle and PSR-18 clients",
+        "spatie/laravel-data": "Data objects become schemas, request bodies and responses; LaravelDataPlugin, found by swagger-php 7.6 plugin discovery"
     }
 }
