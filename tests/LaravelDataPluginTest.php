@@ -7,6 +7,7 @@ use OpenApi\Builder\Mode;
 use OpenApi\Spec as OA;
 use OpenApi\Specification;
 use Orchestra\Testbench\TestCase;
+use PHPUnit\Framework\Attributes\RequiresMethod;
 use Radebatz\OpenApi\Introspector\Adapters\LaravelAdapter;
 use Radebatz\OpenApi\Introspector\IntrospectorPlugin;
 use Radebatz\OpenApi\Introspector\LaravelDataPlugin;
@@ -17,6 +18,7 @@ use Spatie\LaravelData\LaravelDataServiceProvider;
 /**
  * Data objects in a booted Laravel application, as an artisan command sees them.
  */
+#[RequiresMethod(Builder::class, 'withPlugins')]
 final class LaravelDataPluginTest extends TestCase
 {
     protected function getPackageProviders($app): array
