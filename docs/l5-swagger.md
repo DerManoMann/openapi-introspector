@@ -36,7 +36,7 @@ hold only class names and plain values, so the config survives `php artisan conf
 
 The plugins add to the build L5-Swagger configures, so its `annotations` paths, the `pattern` and
 `exclude` scan options and `default_processors_configuration` all apply. Anything the settings cannot express, such as a
-logger or a `prefix`, needs [the factory](#customising-the-factory).
+logger, needs [the factory](#customising-the-factory).
 
 ## With the factory
 

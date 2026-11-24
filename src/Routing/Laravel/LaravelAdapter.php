@@ -58,6 +58,7 @@ final readonly class LaravelAdapter implements ConfigurableAdapterInterface
      * - `schemes`: the security scheme each guard stands for, such as `['sanctum' => 'bearerAuth']`, none by default
      * - `defaultGuard`: the guard a bare `auth` uses, the application's `auth.defaults.guard` by default, `web` where it sets none
      * - `nameAsOperationId`: a bool, `false` by default
+     * - `prefix`: the path a server URL carries, taken off each route path that starts with it, none by default
      * - `routeSource`: a {@see RouteSource} subclass to read the routes and the default guard from, created with no arguments
      */
     public static function fromConfig(array $config, ?LoggerInterface $logger = null): static
@@ -66,6 +67,7 @@ final readonly class LaravelAdapter implements ConfigurableAdapterInterface
         $schemes = [];
         $defaultGuard = null;
         $nameAsOperationId = false;
+        $prefix = '';
         $source = new RouteSource();
 
         foreach ($config as $name => $value) {
@@ -95,6 +97,12 @@ final readonly class LaravelAdapter implements ConfigurableAdapterInterface
                     }
                     $nameAsOperationId = $value;
                     break;
+                case 'prefix':
+                    if (!is_string($value)) {
+                        throw self::invalid($name, $value, 'a path, such as "/api"');
+                    }
+                    $prefix = $value;
+                    break;
                 case 'routeSource':
                     if (!is_string($value) || !is_a($value, RouteSource::class, true) || !self::creatable($value)) {
                         throw self::invalid($name, $value, 'the name of ' . RouteSource::class . ' or a subclass, created with no arguments');
@@ -103,7 +111,7 @@ final readonly class LaravelAdapter implements ConfigurableAdapterInterface
                     break;
                 default:
                     throw new \InvalidArgumentException(sprintf(
-                        'Unknown setting "%s" for %s. Expected one of "middleware", "schemes", "defaultGuard", "nameAsOperationId", "routeSource".',
+                        'Unknown setting "%s" for %s. Expected one of "middleware", "schemes", "defaultGuard", "nameAsOperationId", "prefix", "routeSource".',
                         $name,
                         self::class,
                     ));
@@ -113,6 +121,7 @@ final readonly class LaravelAdapter implements ConfigurableAdapterInterface
         return new self(
             new LazyRoutes(static fn (): array => $source->routes($middleware)),
             nameAsOperationId: $nameAsOperationId,
+            prefix: $prefix,
             logger: $logger,
             authentication: new Authentication($schemes, $defaultGuard ?? $source->defaultGuard(...)),
         );

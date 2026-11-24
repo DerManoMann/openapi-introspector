@@ -181,6 +181,8 @@ uses when its settings name `LaravelAdapter`. The settings, all optional:
 * `defaultGuard` - the guard a bare `auth` uses, the application's `auth.defaults.guard` by
   default, `web` where it sets none
 * `nameAsOperationId` - use route names as operation ids, `false` by default
+* `prefix` - the path a server URL carries, such as `/api`, taken off each route path that starts
+  with it, none by default. See [Paths relative to a server](routes.md#paths-relative-to-a-server)
 * `routeSource` - where the routes and the default guard come from, the class name of
   `Routing\Laravel\RouteSource` or a subclass, created with no arguments
 
@@ -214,5 +216,4 @@ class V2Routes extends RouteSource
 RoutesPlugin::class => [LaravelAdapter::class => ['routeSource' => V2Routes::class]],
 ```
 
-Anything beyond these, such as a `prefix` or middleware of a project's own, needs the adapter
-created in code.
+Anything beyond these, such as middleware of a project's own, needs the adapter created in code.
