@@ -156,6 +156,17 @@ final class RoutesPluginTest extends TestCase
         $this->assertSame([['bearerAuth' => []]], $document['paths']['/account']['get']['security']);
     }
 
+    public function testThePrefixSettingIsTakenOffTheRoutePaths(): void
+    {
+        $this->router->middleware('api')->get('api/v1/users', [UsersController::class, 'index']);
+        $this->router->middleware('api')->get('health', [UsersController::class, 'index']);
+
+        $document = $this->build([LaravelAdapter::class => ['prefix' => '/api']]);
+
+        // a route outside the prefix keeps its path
+        $this->assertSame(['/v1/users', '/health'], array_keys($document['paths']));
+    }
+
     public function testTheMiddlewareSettingTakesAListOfGroups(): void
     {
         $this->router->middleware('api')->get('users', [UsersController::class, 'index']);
@@ -235,6 +246,7 @@ final class RoutesPluginTest extends TestCase
         yield 'defaultGuard' => [[LaravelAdapter::class => ['defaultGuard' => '']], 'Invalid value "" for the "defaultGuard" setting'];
         yield 'routeSource' => [[LaravelAdapter::class => ['routeSource' => Router::class]], 'Invalid value "' . Router::class . '" for the "routeSource" setting'];
         yield 'a routeSource needing arguments' => [[LaravelAdapter::class => ['routeSource' => Fixtures\ContainerRouteSource::class]], 'Invalid value "' . Fixtures\ContainerRouteSource::class . '" for the "routeSource" setting'];
+        yield 'prefix' => [[LaravelAdapter::class => ['prefix' => ['/api']]], 'Invalid value array for the "prefix" setting'];
         yield 'nameAsOperationId' => [[LaravelAdapter::class => ['nameAsOperationId' => 'yes']], 'Invalid value "yes" for the "nameAsOperationId" setting'];
     }
 
