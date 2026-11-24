@@ -50,11 +50,25 @@ The routes come from the framework, and are merged with what the attributes desc
   operation field by field, so you add them only for what a router cannot know: responses,
   request bodies, a better description.
 * **Documentation without a route can be listed.** An inventory records every method and path, and
-  says which are documented but not routed, a defect the document alone cannot show. Reading it
-  needs the introspector registered directly, as in [With the inventory](#with-the-inventory).
+  says which are documented but not routed, a defect the document alone cannot show. In Laravel
+  an artisan command prints it, see [Checking in CI](#checking-in-ci).
 
 This is the reverse of [openapi-router](https://github.com/DerManoMann/openapi-router), which
 builds the routes from the attributes, and a project can use both.
+
+### Checking in CI
+
+In a Laravel application, `php artisan openapi:inventory` builds the document and lists what needs
+attention: operations the attributes document that no route serves, and routes left out because
+attributes document another route at their path. With `--fail-on` it exits with an error when
+there are any, so documentation that has drifted from the routes fails the build:
+
+```yaml
+- run: php artisan openapi:inventory --fail-on unrouted --fail-on conflict
+```
+
+With L5-Swagger installed, the command follows its configuration: the same sources, constants and
+routes. The options are in [From the command line](docs/inventory.md#from-the-command-line).
 
 ### As a plugin
 
