@@ -1,7 +1,47 @@
 # Generating for L5-Swagger
 
-[L5-Swagger](https://github.com/DarkaOnLine/L5-Swagger) 11.2.1 and later take a
-`builder_factory`, and this package has one. In `config/l5-swagger.php`, under `defaults`:
+[L5-Swagger](https://github.com/DarkaOnLine/L5-Swagger) runs this package in one of two ways:
+
+* [with the `plugins` option](#with-the-plugins-option), from L5-Swagger 11.4.0: the plugins are named
+  in the config, with their settings
+* [with the factory](#with-the-factory), from L5-Swagger 11.2.1: the `builder_factory` option takes
+  this package's factory, which can be customised in code
+
+## With the `plugins` option
+
+In `config/l5-swagger.php`, under `defaults`:
+
+```php
+'scanOptions' => [
+    'mode' => 'hybrid',
+    'plugins' => [
+        \Radebatz\OpenApi\Introspector\RoutesPlugin::class => [
+            \Radebatz\OpenApi\Introspector\Routing\Laravel\LaravelAdapter::class => [
+                'schemes' => ['sanctum' => 'bearerAuth'],
+            ],
+        ],
+        \Radebatz\OpenApi\Introspector\LaravelDataPlugin::class,
+    ],
+],
+```
+
+This needs swagger-php 7.3 or later, and `mode` set to `hybrid` or `spec`. Plugins do not run in
+classic mode, which is L5-Swagger's default. `LaravelDataPlugin` is only for a project using
+[spatie/laravel-data](https://github.com/spatie/laravel-data).
+
+`LaravelAdapter`'s settings are listed in [Laravel: from settings](laravel.md#from-settings). They
+hold only class names and plain values, so the config survives `php artisan config:cache`. A bare
+`auth` middleware uses the application's `auth.defaults.guard` as its
+[guard](laravel.md#authentication).
+
+The plugins add to the build L5-Swagger configures, so its `annotations` paths, the `pattern` and
+`exclude` scan options and `default_processors_configuration` all apply. Anything the settings cannot express, such as a
+logger or a `prefix`, needs [the factory](#customising-the-factory).
+
+## With the factory
+
+L5-Swagger 11.2.1 and later take a `builder_factory`, and this package has one. In
+`config/l5-swagger.php`, under `defaults`:
 
 ```php
 'scanOptions' => [
@@ -27,7 +67,7 @@ Of L5-Swagger's own settings, the builder gets:
 `processors`, `analyser`, `analysis` and `default_processors_configuration` configure
 L5-Swagger's classic generator and do not reach the builder.
 
-## Customising the factory
+### Customising the factory
 
 Everything else is customised by subclassing, with the subclass's class name in the config:
 
@@ -71,37 +111,6 @@ The methods to override:
 * `builder()` - the `Builder` before the introspector is registered on it, for anything else
   it takes, such as augmenters
 * `introspector()` - the introspector, for another adapter or a `prefix`
-
-## With the plugin
-
-L5-Swagger has no option for swagger-php plugins, so [`RoutesPlugin`](../README.md#as-a-plugin)
-cannot be set up in `config/l5-swagger.php` alone. A `builder_factory` of the project's own adds
-it, with the plugin's settings in the factory:
-
-```php
-use L5Swagger\CustomBuilderInterface;
-use OpenApi\Builder;
-use OpenApi\Builder\Mode;
-use Radebatz\OpenApi\Introspector\Routing\Laravel\LaravelAdapter;
-use Radebatz\OpenApi\Introspector\RoutesPlugin;
-
-class ApiDocsFactory implements CustomBuilderInterface
-{
-    public function create(): Builder
-    {
-        return (new Builder())
-            ->setMode(Mode::HYBRID)
-            ->withPlugins([
-                RoutesPlugin::class => [LaravelAdapter::class => ['schemes' => ['sanctum' => 'bearerAuth']]],
-            ]);
-    }
-}
-```
-
-It implements L5-Swagger's interface rather than extending `BuilderFactory`, which registers the
-introspector itself. The factory sets the mode, since L5-Swagger's `mode` option does not apply
-to a `builder_factory`, and a logger, where one is wanted, goes to the `Builder` constructor. This
-needs swagger-php 7.3 or later.
 
 ## Before 11.2.1
 

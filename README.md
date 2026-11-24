@@ -82,8 +82,8 @@ $builder->withPlugins([
 ```
 
 `LaravelAdapter`'s settings are listed in [Laravel: from settings](docs/laravel.md#from-settings).
-L5-Swagger has no option for plugins, so the plugin is added through a
-[`builder_factory`](docs/l5-swagger.md#with-the-plugin) of the project's own.
+From L5-Swagger 11.4.0, the plugins go in its `plugins` option, as in
+[Generating for L5-Swagger](docs/l5-swagger.md#with-the-plugins-option).
 
 ### With the inventory
 
