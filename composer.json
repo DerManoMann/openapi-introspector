@@ -61,6 +61,11 @@
             "plugins": [
                 "Radebatz\\OpenApi\\Introspector\\LaravelDataPlugin"
             ]
+        },
+        "laravel": {
+            "providers": [
+                "Radebatz\\OpenApi\\Introspector\\Integrations\\Laravel\\IntrospectorServiceProvider"
+            ]
         }
     },
     "require": {
