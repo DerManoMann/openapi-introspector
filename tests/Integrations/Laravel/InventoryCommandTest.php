@@ -252,7 +252,7 @@ final class InventoryCommandTest extends TestCase
         $this->app['config']->set('openapi-introspector.version', '3.0.0');
 
         $this->inventory()
-            ->expectsOutputToContain('uses const, not supported in OpenAPI 3.0')
+            ->expectsOutputToContain('not supported in OpenAPI 3.0, using enum fallback')
             ->assertSuccessful();
     }
 
@@ -261,7 +261,7 @@ final class InventoryCommandTest extends TestCase
         $this->app['config']->set('l5-swagger.documentations.default.paths.annotations', [__DIR__ . '/../../Fixtures/InventoryVersion']);
 
         $this->inventory()
-            ->expectsOutputToContain('uses const, not supported in OpenAPI 3.0')
+            ->expectsOutputToContain('not supported in OpenAPI 3.0, using enum fallback')
             ->assertSuccessful();
 
         $this->app['config']->set('l5-swagger.defaults.scanOptions.open_api_spec_version', '3.1.0');
