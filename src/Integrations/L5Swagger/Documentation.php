@@ -3,6 +3,7 @@
 namespace Radebatz\OpenApi\Introspector\Integrations\L5Swagger;
 
 use L5Swagger\ConfigFactory;
+use L5Swagger\Generator as L5Generator;
 use OpenApi\Analysers\AnalyserInterface;
 use OpenApi\Analysers\AttributeAnnotationFactory;
 use OpenApi\Analysers\ReflectionAnalyser;
@@ -148,6 +149,16 @@ class Documentation
         }
 
         return [];
+    }
+
+    /**
+     * The OpenAPI version L5-Swagger builds the document for.
+     */
+    public function version(): string
+    {
+        $version = $this->scanOptions()['open_api_spec_version'] ?? null;
+
+        return is_string($version) && $version !== '' ? $version : L5Generator::OPEN_API_DEFAULT_SPEC_VERSION;
     }
 
     /**

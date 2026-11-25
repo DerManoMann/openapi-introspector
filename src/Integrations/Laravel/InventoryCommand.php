@@ -29,7 +29,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * `route:list` already lists the routes, so by default this lists only the entries that need
  * attention, `unrouted` and `conflict`, and counts the rest. With L5-Swagger installed, the build
  * follows one of its documentations, so the inventory is that of the document it serves where its
- * own build adds the routes.
+ * own build adds the routes. Without it, the build follows `config/openapi-introspector.php`.
  */
 class InventoryCommand extends Command
 {
@@ -138,14 +138,21 @@ class InventoryCommand extends Command
             defined($name) || define($name, $value);
         }
 
-        $introspector->addAdapter(LaravelAdapter::fromConfig($documentation?->adapterSettings() ?? [], $logger));
+        $settings = $documentation instanceof Documentation ? null : $this->settings();
+
+        $introspector->addAdapter(LaravelAdapter::fromConfig($documentation?->adapterSettings() ?? $settings['adapter'] ?? [], $logger));
 
         if ($documentation instanceof Documentation && !$documentation->addsRoutes()) {
             $this->report("L5-Swagger's own build does not add the routes, so the document it serves has none of them. The inventory shows what adding them would give.", 'comment');
         }
 
         $builder = $this->builder($documentation?->mode() ?? Mode::HYBRID, $logger)
-            ->addSource($documentation?->sources() ?? app_path());
+            ->addSource($documentation?->sources() ?? $settings['sources'] ?? app_path());
+
+        $version = $documentation?->version() ?? $settings['version'] ?? null;
+        if ($version !== null) {
+            $builder->setVersion($version);
+        }
 
         // attributes only, as L5-Swagger reads them: the generator's default also reads docblock
         // annotations, which would count operations its document does not have
@@ -197,6 +204,35 @@ class InventoryCommand extends Command
         $name = $this->option('documentation');
 
         return $this->hasL5Swagger() ? Documentation::named(is_string($name) ? $name : null) : null;
+    }
+
+    /**
+     * The settings in `config/openapi-introspector.php`, for an application without L5-Swagger.
+     *
+     * @return array{sources: list<string>, version: ?string, adapter: array<string, mixed>}
+     */
+    protected function settings(): array
+    {
+        $config = $this->laravel->bound('config') ? $this->laravel->make('config')->get(IntrospectorServiceProvider::CONFIG) : null;
+        $config = is_array($config) ? $config : [];
+
+        $sources = $config['sources'] ?? [app_path()];
+        if (!is_array($sources) || $sources === [] || !array_is_list($sources) || array_filter($sources, static fn (mixed $source): bool => !is_string($source)) !== []) {
+            throw new \InvalidArgumentException('Invalid openapi-introspector setting "sources". Expected a list of directories and files.');
+        }
+
+        $version = $config['version'] ?? null;
+        if ($version !== null && (!is_string($version) || preg_match('/^3\.\d+\.\d+$/', $version) !== 1)) {
+            throw new \InvalidArgumentException(sprintf('Invalid openapi-introspector setting "version": %s. Expected an OpenAPI version, such as "3.1.0".', is_string($version) ? '"' . $version . '"' : get_debug_type($version)));
+        }
+
+        $adapter = $config['adapter'] ?? [];
+        if (!is_array($adapter)) {
+            throw new \InvalidArgumentException('Invalid openapi-introspector setting "adapter". Expected the LaravelAdapter settings.');
+        }
+
+        /* @var list<string> $sources */
+        return ['sources' => $sources, 'version' => $version, 'adapter' => $adapter];
     }
 
     protected function hasL5Swagger(): bool
