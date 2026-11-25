@@ -75,6 +75,7 @@ the JSON on the standard output stays parseable.
 * its `constants`, defined before the scan as L5-Swagger defines them
 * its `mode`, where that is `spec`, and hybrid otherwise, since classic mode builds no specification
   to add to
+* its `open_api_spec_version` scan option, so the build logs what L5-Swagger's own build logs
 * its `analyser` scan option, or attributes only as L5-Swagger reads them, so docblock annotations
   it ignores are not counted either
 * the `LaravelAdapter` settings its `plugins` option gives `RoutesPlugin`, so the same routes are
@@ -86,7 +87,24 @@ shows what adding them would give. With the `plugins` option, L5-Swagger turns t
 logs into an error, so its own generation fails, and a CI check wants `--fail-on conflict` as well as
 `--fail-on unrouted`.
 
-Without L5-Swagger, it reads the `app/` directory in hybrid mode. Either way, without adapter
-settings, it reads the routes in the `api` middleware group. A
+Without L5-Swagger, the command builds in hybrid mode and follows `config/openapi-introspector.php`.
+The package merges its defaults, so the file is needed only to change one;
+`php artisan vendor:publish --tag=openapi-introspector-config` copies it into the application:
+
+```php
+return [
+    // the directories and files the attributes are read from
+    'sources' => [app_path()],
+    // the OpenAPI version, such as '3.1.0'; null builds the one the OpenApi attribute declares
+    'version' => null,
+    // the LaravelAdapter settings, as L5-Swagger takes them under `plugins`
+    'adapter' => ['prefix' => '/api'],
+];
+```
+
+A project that builds its document with the swagger-php command line sets `version` to the
+`--version` it passes there, so the inventory's build logs what its own does.
+
+Either way, without adapter settings, it reads the routes in the `api` middleware group. A
 [`builder_factory`](l5-swagger.md#with-the-factory) subclass that chooses other routes is not
 followed: the command reads its routes from settings, which a factory does not have.

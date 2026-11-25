@@ -5,6 +5,7 @@ namespace Radebatz\OpenApi\Introspector\Tests\Integrations\Laravel;
 use Composer\InstalledVersions;
 use Composer\Semver\VersionParser;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\ServiceProvider;
 use Illuminate\Testing\PendingCommand;
 use OpenApi\Analysers\AnnotationFactoryInterface;
 use OpenApi\Analysers\ReflectionAnalyser;
@@ -12,6 +13,7 @@ use OpenApi\Builder;
 use OpenApi\Context;
 use OpenApi\GeneratorAwareTrait;
 use Orchestra\Testbench\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RequiresMethod;
 use Radebatz\OpenApi\Introspector\Integrations\L5Swagger\BuilderFactory;
 use Radebatz\OpenApi\Introspector\Integrations\Laravel\IntrospectorServiceProvider;
@@ -218,6 +220,88 @@ final class InventoryCommandTest extends TestCase
         $this->inventory(['--documentation' => 'default'])
             ->expectsOutput('--documentation needs L5-Swagger and its configuration.')
             ->assertExitCode(2);
+    }
+
+    public function testWithoutL5SwaggerFollowsTheSettings(): void
+    {
+        $this->app['config']->set('l5-swagger', null);
+        defined('INVENTORY_TITLE') || define('INVENTORY_TITLE', 'Orders');
+        $this->app['config']->set('openapi-introspector.sources', [__DIR__ . '/../../Fixtures/Inventory']);
+
+        $this->inventory()
+            ->expectsOutput('matched: 1, introspected: 1, unrouted: 1, conflict: 0')
+            ->assertSuccessful();
+
+        // the routes lose the prefix, so neither documented path has a route any more
+        $this->app['config']->set('openapi-introspector.adapter', ['prefix' => '/api']);
+
+        $this->inventory()
+            ->expectsOutput('matched: 0, introspected: 2, unrouted: 2, conflict: 0')
+            ->assertSuccessful();
+    }
+
+    public function testWithoutL5SwaggerBuildsTheConfiguredVersion(): void
+    {
+        $this->app['config']->set('l5-swagger', null);
+        $this->app['config']->set('openapi-introspector.sources', [__DIR__ . '/../../Fixtures/InventoryVersion']);
+
+        $this->inventory()
+            ->doesntExpectOutputToContain('not supported in OpenAPI 3.0')
+            ->assertSuccessful();
+
+        $this->app['config']->set('openapi-introspector.version', '3.0.0');
+
+        $this->inventory()
+            ->expectsOutputToContain('not supported in OpenAPI 3.0, using enum fallback')
+            ->assertSuccessful();
+    }
+
+    public function testBuildsTheVersionOfL5Swagger(): void
+    {
+        $this->app['config']->set('l5-swagger.documentations.default.paths.annotations', [__DIR__ . '/../../Fixtures/InventoryVersion']);
+
+        $this->inventory()
+            ->expectsOutputToContain('not supported in OpenAPI 3.0, using enum fallback')
+            ->assertSuccessful();
+
+        $this->app['config']->set('l5-swagger.defaults.scanOptions.open_api_spec_version', '3.1.0');
+
+        $this->inventory()
+            ->doesntExpectOutputToContain('not supported in OpenAPI 3.0')
+            ->assertSuccessful();
+    }
+
+    /**
+     * @return iterable<string, array{string, mixed, string}>
+     */
+    public static function invalidSettingProvider(): iterable
+    {
+        yield 'sources not a list' => ['sources', 'app', 'Invalid openapi-introspector setting "sources"'];
+        yield 'sources empty' => ['sources', [], 'Invalid openapi-introspector setting "sources"'];
+        yield 'version not a version' => ['version', '3.1', 'Invalid openapi-introspector setting "version": "3.1"'];
+        yield 'adapter not a map' => ['adapter', 'api', 'Invalid openapi-introspector setting "adapter"'];
+        yield 'adapter with an unknown key' => ['adapter', ['middlewares' => 'api'], 'Unknown setting "middlewares"'];
+    }
+
+    #[DataProvider('invalidSettingProvider')]
+    public function testRejectsInvalidSettings(string $setting, mixed $value, string $message): void
+    {
+        $this->app['config']->set('l5-swagger', null);
+        $this->app['config']->set('openapi-introspector.' . $setting, $value);
+
+        $this->inventory()
+            ->expectsOutputToContain($message)
+            ->assertExitCode(2);
+    }
+
+    public function testPublishesTheSettings(): void
+    {
+        $this->assertSame([app_path()], $this->app['config']->get('openapi-introspector.sources'));
+        $this->assertNull($this->app['config']->get('openapi-introspector.version'));
+
+        $published = ServiceProvider::pathsToPublish(IntrospectorServiceProvider::class, 'openapi-introspector-config');
+        $this->assertSame([config_path('openapi-introspector.php')], array_values($published));
+        $this->assertFileExists((string) array_key_first($published));
     }
 
     /**
